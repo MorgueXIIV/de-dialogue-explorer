@@ -1,0 +1,53 @@
+{\s+"title": "\w+ ?Id",\n\s+"value": "0x\w{16}",\n\s+},?\n
+
+\n\s+"type": \d+,\n?\s+"typeString": "\w*"
+(SHOULD HAVE BEEN:)
+,\n\s+"type": \d+,\n?\s+"typeString": "\w*"
+
+,\s*"canvasRect": {\s*"x": 0.0,\s*"y": 0.0,\s*"width": 160.0,\s*"height": 30.0\s*}
+
+,\s*"canvasScrollPosition": {\s*"x": 0.0,\s*"y": 0.0\s*}
+
+,\s*"canvasZoom": 1.0\n
+
+"overrideSettings": {\s*"useOverrides": 0,\s*"overrideSubtitleSettings": 0,\s*"showNPCSubtitlesDuringLine": 1,\s*"showNPCSubtitlesWithResponses": 1,\s*"showPCSubtitlesDuringLine": 0,\s*"skipPCSubtitleAfterResponseMenu": 0,\s*"subtitleCharsPerSecond": 30.0,
+\s*"minSubtitleSeconds": 2.0,\s*"continueButton": 0,\s*"overrideSequenceSettings": 0,\s*"defaultSequence": "",\s*"defaultPlayerSequence": "",\s*"defaultResponseMenuSequence": "",\s*"overrideInputSettings": 0,\s*"alwaysForceResponseMenu": 1,\s*"includeInvalidEntries": 0,\s*"responseTimeout": 0.0\s*},
+
+\s*"delaySimStatus": 0,\s*"falseConditionAction": "",\s*"conditionPriority": 2,
+
+\s*"isRoot": 0,
+
+,\s*"onExecute": ?\{\s*"m_PersistentCalls": \{\s*"m_Calls": \[\]\s*\}\s*\}
+
+REPLACES:
+\s*{\s*"title": "(.*)",(\s*)"value": (.*)\s*}(,?)  BECOMES  ${2}{"${1}" : ${3}}${4}
+
+IDs 1-136 inclusive, are QUESTS.
+
+1366 gates eyes
+ID 1382 is a bunch of newspaper endings
+ID 1381 is morale ending dialogues (removed, used to be tutorial?) 1380 same but endurance
+
+
+
+MAYBE?
+
+
+
+,\s*{\s*"title": "(.*)",\s*"value": ""\s*}
+\s*{\s*"title": "(.*)",\s*"value": "(.*)"\s*} becomes "${1}" : "${2}"\n
+
+\s*{\s*"title": "(.*)",(\s*)"value": "(.*)"\s*}(,?) BECOMES ${2}{"${1}" : "${3}"}${4}\n
+\s*{\s*"title": "(.*)",(\s*)"value": "(.*)"\s*}(,?) BECOMES ${2}{"${1}" : "${3}"}${4}\n
+
+
+NO
+"fields": \[([^\}\{]*)\]
+\s*{\s*"title": "(.*)",\n(\s*)"value": (.*)\s*}(,?) BECOMES; \n${2}"${1}" : ${3} ${4} 
+THEN: \s*"fields" ?: ?\[ (no)
+\s*"fields" ?:\s*\[([(?:\s*"\w+" ?:.*)\s*]*)\s+\] (doens't work, even a bit)
+
+
+"\w*ConversationID": 754,
+\s*"\w*DialogueID": 271,
+
