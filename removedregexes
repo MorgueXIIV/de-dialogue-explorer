@@ -32,6 +32,20 @@ ID 1381 is morale ending dialogues (removed, used to be tutorial?) 1380 same but
 
 MAYBE?
 
+"fields" ?: ?\[([^&]*?\}\s*)\] BECOMES: "fields": \{${1}\}
+AND
+\{(.*?)\} ceomes: ${1}
+errors@:\[\s*"\w*" ?:
+\[(\s*"\w*" ?:[^\[\]]*)\] Becomes: \{${1}\}
+
+
+ERRORED TO FUCK:
+"fields" ?: ?\[([^&]*?)(\n +)\] becomes: "fields": \{${1}${2}\}
+THEN:
+\{(.*?)\} ceomes: ${1}
+
+
+
 
 
 ,\s*{\s*"title": "(.*)",\s*"value": ""\s*}
