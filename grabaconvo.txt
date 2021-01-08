@@ -1,0 +1,13 @@
+extractconvo;
+make a file with only the one conversation array, using the sublime brackets scope selector
+
+grep it to a new file;
+grep [\"][TD]i[ta]l[eo][\"g] conversationtoextract.json > thelines.md
+
+
+ *"Title" : "(.*?:).*\s*"Dialogue Text" : (.*)
+REPLACE:
+**$1**\n\t$2
+
+REMOVE: \s*"Title".* if you wanna get rid of modifiers etc
+
