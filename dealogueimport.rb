@@ -9,7 +9,7 @@ def IDConvo(idNumber=1, dialoguefile=dealogues)
 end
 
 def IDConvoLine(idNumber, convo)
-	return convo["dialogueEntries"][idNumber-1];
+	return convo["dialogueEntries"][idNumber];
 end
 
 json= File.read('Disco Elysium Cut.json');
@@ -21,7 +21,7 @@ puts "conversations dialogueEntries fields 562 fields class" + dealogues["conver
 puts "conversations dialogueEntries fields 562 fields 2 Title; " + dealogues["conversations"][562]["dialogueEntries"][2]["fields"]["Title"];
 puts "conversations dialogueentries fields title class" + dealogues["conversations"][562]["dialogueEntries"][2]["fields"]["Title"].class.to_s;
 thisConvo=IDConvo(563, dealogues);
-puts "conversation 563, entry 5" + IDConvoLine(5, thisConvo).to_s;
+puts "conversation 563, entry 6" + IDConvoLine(6, thisConvo).to_s;
 
 
 
