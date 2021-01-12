@@ -58,6 +58,7 @@ begin
   	PRIMARY KEY(id, conversationid))";
 	listOfLineAtts=["id","Title","Dialogue Text","Sequence","Actor","Conversant","conversationID","isGroup","conditionsString","userScript"]
 	numberOfdbEntriesMade=0;
+	db.transaction
 	for thisConvo in dealogues["conversations"] do
 		conversationAtts=[getCLAttribute(thisConvo, "id"), getCLAttribute(thisConvo, "Title"), getCLAttribute(thisConvo, "Description"), getCLAttribute(thisConvo, "Actor"), getCLAttribute(thisConvo, "Conversant")];
 		db.execute "INSERT INTO dialogues (id, title, description, actor, conversant) VALUES (?,?,?,?,?)", conversationAtts;
@@ -71,9 +72,11 @@ begin
 			numberOfdbEntriesMade+=1;
 		end
 	end
+	db.commit
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 rescue SQLite3::Exception => e 
     puts "there was an error" + e.to_s;
+    db.rollback
 ensure
     # If the whole application is going to exit and you don't
     # need the database at all any more, ensure db is closed.
