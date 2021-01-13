@@ -20,7 +20,7 @@ def getCLAttribute(convoOrLine, attributeToGrab)
 		if convoOrLine["fields"].has_key?(attributeToGrab) then
 			return convoOrLine["fields"][attributeToGrab];
 		else
-			return "bad attribute bro";
+			return 0;
 		end
 	end
 end
@@ -47,8 +47,13 @@ dealogues=JSON.parse(json);
 begin
 	# numberofConversations = dealogues["conversations"].length()	
 	db = SQLite3::Database.open 'test.db'
+
 	db.execute """CREATE TABLE IF NOT EXISTS dialogues
 	(id INT PRIMARY KEY, title TEXT, description TEXT, actor INT, conversant INT)""";
+
+	db.execute """CREATE TABLE IF NOT EXISTS actors
+	(id INT PRIMARY KEY, name TEXT, description LONGTEXT)""";
+
 	db.execute """CREATE TABLE IF NOT EXISTS dentries
 	(id INT, title TEXT, dialoguetext TEXT, 
 	actor INT, conversant INT, conversationid INT,
@@ -56,11 +61,28 @@ begin
  	hasalts BOOL DEFAULT false, conditionstring TEXT, userscript TEXT,
   	FOREIGN KEY (conversationid) REFERENCES dialogues(id),
   	PRIMARY KEY(id, conversationid))";
+
 	listOfLineAtts=["id","Title","Dialogue Text","Sequence","Actor","Conversant","conversationID","isGroup","conditionsString","userScript"]
+	listOfConvoAtts=["id", "Title", "Description","Actor","Conversant"]
+
 	numberOfdbEntriesMade=0;
 	db.transaction
+	for thisActor in dealogues["actors"] do
+		actorAtts=[getCLAttribute(thisActor,"id"),getCLAttribute(thisActor,"Name")];
+		aDescription = getCLAttribute(thisActor,"Description").to_s + ":";
+		aDescription.concat(getCLAttribute(thisActor,"short_description").to_s + ":");
+		aDescription.concat(getCLAttribute(thisActor,"LongDescription").to_s);
+		actorAtts.push(aDescription);
+		db.execute "INSERT INTO actors (id, name, description) values (?,?,?)", actorAtts;
+		numberOfdbEntriesMade+=1;
+	end
+
+
 	for thisConvo in dealogues["conversations"] do
-		conversationAtts=[getCLAttribute(thisConvo, "id"), getCLAttribute(thisConvo, "Title"), getCLAttribute(thisConvo, "Description"), getCLAttribute(thisConvo, "Actor"), getCLAttribute(thisConvo, "Conversant")];
+		conversationAtts=[]
+		listOfConvoAtts.each do |attributeToGrab|
+				conversationAtts.push(getCLAttribute(thisConvo,attributeToGrab));
+			end
 		db.execute "INSERT INTO dialogues (id, title, description, actor, conversant) VALUES (?,?,?,?,?)", conversationAtts;
 		numberOfdbEntriesMade+=1;
 		for thisLine in thisConvo["dialogueEntries"] do
