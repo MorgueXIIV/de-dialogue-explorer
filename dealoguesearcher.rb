@@ -39,6 +39,8 @@ begin
 				searchDias.concat(getLineByIDs(db,dia[0],dia[1]))
 				if searchDias.length>0
 					puts i.to_s+": " + searchDias[i][0]+": " + searchDias[i][1]
+				else 
+		 			puts "No more results.";
 				end
 			end
 		else 
