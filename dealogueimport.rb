@@ -28,12 +28,22 @@ def getCLAttribute(convoOrLine, attributeToGrab)
 	end
 end
 
-#reads in and parses the JSON
-#THIS NEEDS ERROR HANDLING?
-json= File.read('Disco Elysium Cut.json');
-dealogues=JSON.parse(json);
+def getArrayForDB(hashToInspect, arrayOfAttributes)
+	arrayOfData = []
+	arrayOfAttributes.each do |attributeToGrab|
+		arrayOfData.push(getCLAttribute(hashToInspect,attributeToGrab));
+	end
+	return arrayOfData;
+end
 
+
+#reads in and parses the JSON
+#TEST NEW ERROR HANDLING PLS
 begin
+	json= File.read('Disco Elysium Cut.json');
+	dealogues=JSON.parse(json);
+
+
 	# opens a DB file, Creates our database tables	
 	db = SQLite3::Database.open 'test.db'
 
@@ -51,17 +61,26 @@ begin
   	FOREIGN KEY (conversationid) REFERENCES dialogues(id),
   	FOREIGN KEY (actor) REFERENCES actors(id),
   	FOREIGN KEY (conversant) REFERENCES actors(id),
-  	PRIMARY KEY(id, conversationid))";
-  	# TODO: database table for links
+  	PRIMARY KEY(conversationid,id))""";
 
-# these keys represent the various attributes we need from each hash to fed into the database
+  	db.execute """CREATE TABLE IF NOT EXISTS dlinks
+	(originconversationid INT, origindialogueid INT,
+	destinationconversationid INT, destinationdialogueid INT,
+	isConnector BOOL DEFAULT false, priority INT DEFAULT 2,
+  	FOREIGN KEY (originconversationid,origindialogueid) REFERENCES dentries(conversationid, id),
+  	FOREIGN KEY (destinationconversationid,destinationdialogueid) REFERENCES dentries(conversationid, id))""";
+  	# database table for links
+
+# these strings represent the various keys we need from each hash to fed into the database
+# stored in an ITERABLE array so we can easily use them in a method for a nice DRY grab of data to insert
 	listOfLineAtts=["id","Title","Dialogue Text","Sequence","Actor","Conversant","conversationID","isGroup","conditionsString","userScript"]
 	listOfConvoAtts=["id", "Title", "Description","Actor","Conversant"]
+	listOfLinkAtts=["originConversationID","originDialogueID","destinationConversationID","destinationDialogueID","isConnector","priority"]
 
 #inistialise counter
 	numberOfdbEntriesMade=0;
 	#using transactions means the database is written to all at once making all these entries
-	#which is MUCH much faster in SQLite
+	#which is MUCH much faster in SQLite than making a comitted transation for each othe 10,000 + entries
 	db.transaction
 
 	#Loop over the actors array, create a hash of relevant attributes (concatenate descriptions), stick them in the database
@@ -79,35 +98,44 @@ begin
 	for thisConvo in dealogues["conversations"] do
 		conversationAtts=[]
 		#REFACTOR POTENTIAL CODE 001
-		listOfConvoAtts.each do |attributeToGrab|
-				conversationAtts.push(getCLAttribute(thisConvo,attributeToGrab));
-			end
+		# listOfConvoAtts.each do |attributeToGrab|
+		# 		conversationAtts.push(getCLAttribute(thisConvo,attributeToGrab));
+		# 	end
+		conversationAtts=getArrayForDB(thisConvo,listOfConvoAtts);
+
 		db.execute "INSERT INTO dialogues (id, title, description, actor, conversant) VALUES (?,?,?,?,?)", conversationAtts;
 		numberOfdbEntriesMade+=1;
 		#SUB LOOP; for every conversation we also need to enter the many sub-lines of that conversation
 		for thisLine in thisConvo["dialogueEntries"] do
 			lineAtts=[]
 			# REFACTOR POTENTIAL CODE 001
-			listOfLineAtts.each do |attributeToGrab|
-				lineAtts.push(getCLAttribute(thisLine,attributeToGrab));
-			end
+			# listOfLineAtts.each do |attributeToGrab|
+			# 	lineAtts.push(getCLAttribute(thisLine,attributeToGrab));
+			# end
+			lineAtts=getArrayForDB(thisLine,listOfLineAtts);
+
 			db.execute "INSERT INTO dentries (id, title, dialoguetext, sequence, actor, conversant, conversationid,isgroup,conditionstring,userscript) VALUES (?,?,?,?,?,?,?,?,?,?)", lineAtts;
 			numberOfdbEntriesMade+=1;
-			#TODO: add ANOTHER loop which enters any outgoing links to the links database.
-			if thisLine.has_key("outgoingLinks") then
+			#add ANOTHER loop which enters any outgoing links to the links database.
+			if thisLine.has_key?("outgoingLinks") then
 				#linksdb loop
 				for thisLink in thisLine["outgoingLinks"] do
-					linkAttArray=[] #TODO create array
-					db.execute "", linkAttArray #TODO SQL insert
+					linkAtts=[] #create array
+					linkAtts=getArrayForDB(thisLink,listOfLinkAtts);
+					db.execute "INSERT INTO dlinks (originconversationid, origindialogueid, destinationconversationid, destinationdialogueid, isConnector, priority) VALUES (?,?,?,?,?,?)", linkAtts #SQL insert
 					numberOfdbEntriesMade+=1;
+				end
 			end
 		end
 	end
 	db.commit
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 rescue SQLite3::Exception => e 
-    puts "there was an error: " + e.to_s;
+    puts "there was a Database Creation error: " + e.to_s;
     db.rollback
+
+rescue JSON::UnparserError => e 
+    puts "there was a JSON Parse error: " + e.to_s;
 ensure
     # If the whole application is going to exit and you don't
     # need the database at all any more, ensure db is closed.
