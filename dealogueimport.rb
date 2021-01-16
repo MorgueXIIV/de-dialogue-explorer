@@ -96,27 +96,22 @@ begin
 
 	#loop over the conversations and enter them into the database
 	for thisConvo in dealogues["conversations"] do
+
 		conversationAtts=[]
-		#REFACTOR POTENTIAL CODE 001
-		# listOfConvoAtts.each do |attributeToGrab|
-		# 		conversationAtts.push(getCLAttribute(thisConvo,attributeToGrab));
-		# 	end
 		conversationAtts=getArrayForDB(thisConvo,listOfConvoAtts);
 
 		db.execute "INSERT INTO dialogues (id, title, description, actor, conversant) VALUES (?,?,?,?,?)", conversationAtts;
 		numberOfdbEntriesMade+=1;
 		#SUB LOOP; for every conversation we also need to enter the many sub-lines of that conversation
 		for thisLine in thisConvo["dialogueEntries"] do
+
 			lineAtts=[]
-			# REFACTOR POTENTIAL CODE 001
-			# listOfLineAtts.each do |attributeToGrab|
-			# 	lineAtts.push(getCLAttribute(thisLine,attributeToGrab));
-			# end
 			lineAtts=getArrayForDB(thisLine,listOfLineAtts);
 
 			db.execute "INSERT INTO dentries (id, title, dialoguetext, sequence, actor, conversant, conversationid,isgroup,conditionstring,userscript) VALUES (?,?,?,?,?,?,?,?,?,?)", lineAtts;
 			numberOfdbEntriesMade+=1;
-			#add ANOTHER loop which enters any outgoing links to the links database.
+
+			#add ANOTHER loop which enters any outgoing links to the links database IF they exist;
 			if thisLine.has_key?("outgoingLinks") then
 				#linksdb loop
 				for thisLink in thisLine["outgoingLinks"] do
@@ -132,14 +127,14 @@ begin
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 rescue SQLite3::Exception => e 
     puts "there was a Database Creation error: " + e.to_s;
+    #Rollback prevents partially complete data sets being inserted
+    #minimising re-run errors after an exception is raised mid records
     db.rollback
 
 rescue JSON::UnparserError => e 
     puts "there was a JSON Parse error: " + e.to_s;
 ensure
-    # If the whole application is going to exit and you don't
-    # need the database at all any more, ensure db is closed.
-    # Otherwise database closing might be handled elsewhere.
+    # close DB, success or fail
     db.close if db
 end
 
