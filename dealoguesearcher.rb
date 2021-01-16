@@ -7,6 +7,11 @@ def findParentLineIDs(db,convoID,lineID)
 	return idsArray;
 end
 
+def findChildLineIDs(db,convoID,lineID)
+	idsArray=db.execute"SELECT destinationconversationid, destinationdialogueid FROM dlinks WHERE originconversationid='#{convoID}' AND origindialogueid='#{lineID}'";
+	return idsArray;
+end
+
 def getLineByIDs(db,convoID,lineID)
 	dialogueArray=db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conversationid, dentries.id FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}' AND dentries.id='#{lineID}'";
 	return dialogueArray;
@@ -76,26 +81,56 @@ begin
 				lineSelector="q"
 			end
 		end
-
-		# if firstParents.length==1 then
-		# 	searchDias=getLineByIDs(db,firstParents[0][0],firstParents[0][1])
-		# 	puts searchDias[0][0]+": " + searchDias[0][1]
-		# 	lineSelector=0;
-		# elsif firstParents.length>0 then
-		# 	firstParents.each_with_index do |dia,i|
-		# 		searchDias.concat(getLineByIDs(db,dia[0],dia[1]))
-		# 			puts i.to_s+": " + searchDias[i][0]+": " + searchDias[i][1]
-		# 	end
-		# else 
-		#  	puts "No more results.";
-		#  	lineSelector="q"
-		# end
-		# if lineSelector==-1
-		# 	puts "select a line: (q to exit)"
-		# 	lineSelector=gets.chomp
-		# end
 	end
 
+	puts "find (n)ext lines, or (q)uit?"
+	lineSelector=gets.chomp;
+	if not lineSelector=="q"
+		searchDias=diaCollection.pop(1)
+		lineSelector=="0"
+	end
+
+	while not lineSelector=="q" do
+		lineSelector=lineSelector.to_i
+		# if diaCollection.nil? then
+		# 	diaCollection=[];
+		# end
+		
+		diaCollection.push(searchDias[lineSelector])
+		# binding.pry
+		
+		firstChildren=[]
+		#finds the lines that LEAD TO that line, then prints them
+		if searchDias.length > 0 then
+			firstChildren=findChildLineIDs(db,searchDias[lineSelector][2],searchDias[lineSelector][3]);
+		end
+
+		lineSelector=0
+		searchDias=[]
+
+		if (firstChildren.nil? || firstChildren.empty?) then
+			puts "Tree Root/End here, outputting conversation, and quiting."
+			lineSelector="q"
+		else
+			# searchDias=[]
+			searchDias=(makeIDsLines(db,firstChildren))
+
+			searchDias.each_with_index do |dia, i|
+				puts i.to_s + ": " + strADiaLine(dia)
+			end
+
+			if searchDias.length==1 then
+				lineSelector="0";
+			elsif searchDias.length>1 then
+				puts "select a dialogue option:"
+				lineSelector=gets.chomp;
+			else
+				"huh so I can't find the right lines sorry"
+				lineSelector="q"
+			end
+		end
+	end
+	puts "Thank You For Using the FAYDE Playback Experiment!"
 	#ouput the lines found one dialogue has been finished
 	diaCollection.each{|dia| puts dia[0] + ": " + dia[1];}
 
