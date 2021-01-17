@@ -14,7 +14,7 @@ def findChildLineIDs(db,convoID,lineID)
 end
 
 def getLineByIDs(db,convoID,lineID)
-	dialogueArray=db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conversationid, dentries.id FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}' AND dentries.id='#{lineID}'";
+	dialogueArray=db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conversationid, dentries.id, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}' AND dentries.id='#{lineID}'";
 	return dialogueArray;
 end
 
@@ -27,7 +27,11 @@ def makeIDsLines(db,lineIDs)
 end
 
 def strADiaLine(lineArray)
-	return "#{lineArray[0]}:".colorize(:light_blue)+" #{lineArray[1]}"
+	if lineArray[1]=="0" && lineArray.length>4 then
+		return "#{lineArray[0]}: #{lineArray[4]}".colorize(:cyan)
+	else
+		return "#{lineArray[0]}:".light_blue.bold+" #{lineArray[1]}"
+	end
 end
 
 #receive text input from command line
@@ -72,7 +76,7 @@ begin
 				lineSelector="0";
 				puts strADiaLine(searchDias[0]).colorize(:gray)
 			elsif searchDias.length>1 then
-				puts "select a dialogue option:".colorize(:red)
+				puts "select a dialogue option:".colorize(:light_red)
 				searchDias.each_with_index do |dia, i|
 					puts i.to_s.colorize(:light_red).underline + ": " + strADiaLine(dia)
 				end
@@ -132,9 +136,9 @@ begin
 			end
 		end
 	end
-	puts "Thank You For Using the FAYDE Playback Experiment!".colorize(:light_green)
+	puts "Thank You For Using the".colorize(:light_green) + "FAYDE Playback Experiment!".colorize(:yellow)
 	#ouput the lines found one dialogue has been finished
-	diaCollection.each{|dia| puts dia[0].colorize(:light_blue) + ": " + dia[1];}
+	diaCollection.each{|dia| puts strADiaLine(dia);}
 
 #error handling.
 rescue SQLite3::Exception => e 
