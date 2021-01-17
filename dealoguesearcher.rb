@@ -1,6 +1,7 @@
 require "rubygems"
 require 'sqlite3'
 require 'pry'
+require "colorize"
 
 def findParentLineIDs(db,convoID,lineID)
 	idsArray=db.execute"SELECT originconversationid, origindialogueid FROM dlinks WHERE destinationconversationid='#{convoID}' AND destinationdialogueid='#{lineID}'";
@@ -26,7 +27,7 @@ def makeIDsLines(db,lineIDs)
 end
 
 def strADiaLine(lineArray)
-	return "#{lineArray[0]}: #{lineArray[1]}"
+	return "#{lineArray[0]}:".colorize(:light_blue)+" #{lineArray[1]}"
 end
 
 #receive text input from command line
@@ -67,14 +68,14 @@ begin
 			# searchDias=[]
 			searchDias=(makeIDsLines(db,firstParents))
 
-			searchDias.each_with_index do |dia, i|
-				puts i.to_s + ": " + strADiaLine(dia)
-			end
-
 			if searchDias.length==1 then
 				lineSelector="0";
+				puts strADiaLine(searchDias[0]).colorize(:gray)
 			elsif searchDias.length>1 then
-				puts "select a dialogue option:"
+				puts "select a dialogue option:".colorize(:red)
+				searchDias.each_with_index do |dia, i|
+					puts i.to_s.colorize(:light_red).underline + ": " + strADiaLine(dia)
+				end
 				lineSelector=gets.chomp;
 			else
 				"huh so I can't find the right lines sorry"
@@ -83,7 +84,7 @@ begin
 		end
 	end
 
-	puts "find (n)ext lines, or (q)uit?"
+	puts "find (n)ext lines, or (q)uit?".colorize(:light_red)
 	lineSelector=gets.chomp;
 	if not lineSelector=="q"
 		searchDias=diaCollection.pop(1)
@@ -115,14 +116,15 @@ begin
 			# searchDias=[]
 			searchDias=(makeIDsLines(db,firstChildren))
 
-			searchDias.each_with_index do |dia, i|
-				puts i.to_s + ": " + strADiaLine(dia)
-			end
 
-			if searchDias.length==1 then
+			if searchDias.length==1 then				
 				lineSelector="0";
+				puts strADiaLine(searchDias[0]).colorize(:gray)
 			elsif searchDias.length>1 then
-				puts "select a dialogue option:"
+				puts "select a dialogue option:".colorize(:light_red)
+				searchDias.each_with_index do |dia, i|
+					puts i.to_s.colorize(:light_red) + ": " + strADiaLine(dia)
+				end
 				lineSelector=gets.chomp;
 			else
 				"huh so I can't find the right lines sorry"
@@ -130,9 +132,9 @@ begin
 			end
 		end
 	end
-	puts "Thank You For Using the FAYDE Playback Experiment!"
+	puts "Thank You For Using the FAYDE Playback Experiment!".colorize(:light_green)
 	#ouput the lines found one dialogue has been finished
-	diaCollection.each{|dia| puts dia[0] + ": " + dia[1];}
+	diaCollection.each{|dia| puts dia[0].colorize(:light_blue) + ": " + dia[1];}
 
 #error handling.
 rescue SQLite3::Exception => e 
