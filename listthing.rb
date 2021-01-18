@@ -11,4 +11,4 @@ end
 puts "Select a line:"
 rowSelect=gets.chomp.to_i
 
-puts [rand(2)][rowSelect]
+puts table[rowSelect-1][rand(2)]
