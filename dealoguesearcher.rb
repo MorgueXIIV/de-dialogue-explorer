@@ -190,7 +190,7 @@ begin
 	#iterates over array of results, outputing the name and then dialogue
 	searchobjects=[]
 	searchDias.each {|dia| searchobjects.push(DialogueEntry.new(dia[2],dia[3]))}
-	searchobjects.each_with_index{|dia,i| puts "#{i}: "+ dia.myStory(true) }
+	searchobjects.each_with_index{|dia,i| puts "#{i}: "+ dia.to_s(true)+"\n"+"\n" }
 	# asks user which of the searc results they "like"
 	puts "select a line: (q to exit)"
 	diaCollection=[];
