@@ -127,7 +127,7 @@ class DialogueExplorer
 		choice = gets.chomp
 		case choice
 		when "q"
-			self.output
+			# self.output
 		when "n"
 			self.nextlines
 		when "p"
@@ -172,6 +172,18 @@ class DialogueExplorer
 		end
 	end 
 
+	def conversationinfo()
+		if @nowLine.nil?
+			puts "Which conversation ID?"
+			convoID=gets.chomp.to_i
+		else
+			convoID=@nowLine.getConvoID
+		end
+		searchDias=$db.execute "SELECT title, description FROM dialogues WHERE id='#{convoID}'"
+		searchDias.each do |lineArray|
+			puts "#{lineArray[0]}: #{lineArray[1]}".colorize(:cyan)
+		end
+	end 
 
 	def searchlines()
 		#receive text input from command line, remove " and 's with GSUB"
@@ -196,6 +208,8 @@ class DialogueExplorer
 			puts @nowLine.to_s
 			@nowOptions=@nowLine.getChildren()
 			@nowLine=nil
+		elsif not @lineCollection[-1].nil? 
+			@nowOptions=@lineCollection[-1].getChildren()
 		end
 
 		if optionsAvail?
@@ -207,8 +221,32 @@ class DialogueExplorer
 				choiceprocess()
 			end
 		end
-
 	end
+
+
+	def prevlines()
+		@currentJob="prev"
+
+		if lineSelected? then
+			@lineCollection.unshift(@nowLine)
+			puts @nowLine.to_s
+			@nowOptions=@nowLine.getParents()
+			@nowLine=nil
+		elsif not @lineCollection[0].nil? 
+			@nowOptions=@lineCollection[0].getParents()
+		end
+
+		if optionsAvail?
+			if @nowOptions.length==1
+				@nowLine = @nowOptions[0]
+				prevlines()
+			else
+				puts "choose a line (type number) ".light_red
+				choiceprocess()
+			end
+		end
+	end
+
 end
 
 # id,title,dialoguetext,actor,conversant,conversationid,isgroup,hascheck,sequence,hasalts,conditionstring,userscript
