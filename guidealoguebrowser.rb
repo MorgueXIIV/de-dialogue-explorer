@@ -1,4 +1,6 @@
-require "rubygems"
+require 'tk'
+
+# require "rubygems"
 require 'sqlite3'
 require 'pry'
 require "colorize"
@@ -31,24 +33,26 @@ class DialogueEntry
 
     def getParents()
     	if @parents.nil? or @parents.empty? then
-	    	idsArray=$db.execute"SELECT originconversationid, origindialogueid FROM dlinks WHERE destinationconversationid='#{@conversationid}' AND destinationdialogueid='#{@id}'";
+	    	idsArray=$db.execute"SELECT originconversationid/., origindialogueid FROM dlinks WHERE destinationconversationid='#{@conversationid}' AND destinationdialogueid='#{@id}'";
 	    	parentsList=[]
 	    	idsArray.each do |idPair|
 	    		parentsList.push(DialogueEntry.new(idPair[0],idPair[1]))
 	    	end
 	    	@parents=parentsList
-	    end
+    	end
     	return @parents
     end
 
     def getChildren()
-    	idsArray=$db.execute"SELECT destinationconversationid, destinationdialogueid FROM dlinks WHERE originconversationid='#{@conversationid}' AND origindialogueid='#{@id}'";
-		childsList=[]
-		idsArray.each do |idPair|
-			childsList.push(DialogueEntry.new(idPair[0], idPair[1]))
+    	if @children.nil? or @children.empty?
+	    	idsArray=$db.execute"SELECT destinationconversationid, destinationdialogueid FROM dlinks WHERE originconversationid='#{@conversationid}' AND origindialogueid='#{@id}'";
+			childsList=[]
+			idsArray.each do |idPair|
+				childsList.push(DialogueEntry.new(idPair[0], idPair[1]))
+			end
+			@children=childsList
 		end
-		@children=childsList
-		return childsList
+		return @children
 	end
 
 
@@ -81,17 +85,16 @@ class DialogueEntry
 		return @conversationid
 	end
 
-
 end
 
 
 class DialogueExplorer
+
 	def initialize()
 		@nowLine=nil
 		@lineCollection=Array.new()
 		@nowOptions=Array.new()
 		@nowJob=""
-		choiceprocess()
 		output()
 	end
 
@@ -163,7 +166,7 @@ class DialogueExplorer
 			convoID=gets.chomp.to_i
 		else
 			convoID=@nowLine.getConvoID
-		end
+		end 
 		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conversationid, dentries.id, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
 		searchDias.each do |lineArray|
 			if lineArray[1]=="0" && lineArray.length>4 then
@@ -187,19 +190,20 @@ class DialogueExplorer
 		end
 	end 
 
-	def searchlines()
-		#receive text input from command line, remove " and 's with GSUB"
-		puts "Enter search query:"
-		searchQ=gets.chomp
+	def searchlines(searchQ=nil)
+		if searchQ.nil? or searchQ.length<3
+			#receive text input from command line, remove " and 's with GSUB"
+			puts "Enter search query: (over 3 chars)"
+			searchQ=gets.chomp
+		end
 		searchQ.gsub!("'", "_")
 		searchQ.gsub!('"', "_")
-				#us SQL query to get the actor name, and dialogue text from two joined tables, when they partial match the provided input string.
-				#todo refactor ot only return IDs
-		searchDias=$db.execute "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'";
-		#iterates over array of results, outputing the name and then dialogue
+				#us SQL query to get the line IDs when they partial match the provided input string.
+		searchDias=$db.execute "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%' limit 100";
+		#iterates over array of results, getting objects based on their id
 		@nowOptions=[]
 		searchDias.each {|dia| @nowOptions.push(DialogueEntry.new(dia[0],dia[1]))}
-		choiceprocess()
+		return @nowOptions;
 	end
 
 	def nextlines()
@@ -220,7 +224,6 @@ class DialogueExplorer
 				nextlines()
 			else
 				puts "choose a line (type number) ".light_red
-				choiceprocess()
 			end
 		end
 	end
@@ -244,24 +247,76 @@ class DialogueExplorer
 				prevlines()
 			else
 				puts "choose a line (type number) ".light_red
-				choiceprocess()
 			end
 		end
 	end
 
 end
 
+
+class GUIllaume
+	def initialize()
+		@root = TkRoot.new { title "FAYDE Playback Experiment" }
+		@explorer=DialogueExplorer.new()
+
+		@content = TkFrame.new(@root).grid(:sticky => 'nsew')
+
+		ph = { 'padx' => 10, 'pady' => 10 } 
+
+		sear= proc {makeSearchResults}
+		TkGrid.columnconfigure @root, 0, :weight => 1; TkGrid.rowconfigure @root, 0, :weight => 1
+
+		@searchStr = TkVariable.new;
+		@searchStr.value="tip-top"
+		@searchBox = TkEntry.new(@content, 'width'=> 7, 'textvariable' => @searchStr).grid( :column => 2, :row => 1, :sticky => 'we' )
+
+	    # @entry = TkEntry.new(top, 'textvariable' => @text)
+
+		@searchResults = TkVariable.new
+		@resultsCount = TkVariable.new
+		@searchResults.value="pending"
+		TkLabel.new(@content, "textvariable" => @searchResults).grid( :column => 2, :row => 4, :sticky => 'we');
+		TkButton.new(@content, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 3, :sticky => 'w')
+
+		TkLabel.new(@content) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'w')
+		TkLabel.new(@content) {text 'we found;'}.grid( :column => 1, :row => 2, :sticky => 'e')
+		TkLabel.new(@content) {text 'lines'}.grid( :column => 3, :row => 2, :sticky => 'w')
+		TkLabel.new(@content, "textvariable" => @resultsCount).grid( :column => 2, :row => 2, :sticky => 'we');
+	end
+
+	def makeSearchResults()
+		puts "makeSearchResults has executed"
+		searchStr=@searchStr.value
+		searchResults=""
+		objectSearch=@explorer.searchlines(searchStr)
+		@resultsCount.value=objectSearch.length
+		objectSearch.each do |result|
+			puts "ha ha, " + result.to_s
+
+			searchResults.concat(result.to_s+"\n")
+		end
+		@searchResults.value=searchResults
+		# return searchResults
+	end
+
+end
+
+
 begin
 	# opens a DB file to search
 	$db = SQLite3::Database.open 'test.db'
-    # db=$db
+    GUIllaume.new()
+	
+	Tk.mainloop
 
-    ourprogram=DialogueExplorer.new()
+    # commenting out because creating this is now handled in the GUI for scope reasons
+    # ourprogram=DialogueExplorer.new()
 
-#error handling.
+# #error handling.
 rescue SQLite3::Exception => e 
     puts "there was a Database error: " + e.to_s;
 ensure
     # close DB, success or fail
     $db.close if $db
 end
+
