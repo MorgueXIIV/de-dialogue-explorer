@@ -58,13 +58,15 @@ class DialogueEntry
 
 	def to_s(lomg=false)
 		if @dialoguetext=="0" then
-			stringV = "#{@actor}: #{@title}".colorize(:cyan)
+			stringV = "#{@actor}: #{@title}"
+			#.colorize(:cyan)
 		else
-			stringV = "#{@actor}:".light_blue.bold+" #{@dialoguetext}"
+			stringV = "#{@actor}: #{@dialoguetext}"
+			# .light_blue.bold+
 		end
 
 		if lomg
-			stringV.concat("/#{@condition}/#{@userscript}/#{@sequence}")
+			stringV.concat("\n/#{@condition}/#{@userscript}/#{@sequence}")
 		end
 
 		return stringV
@@ -259,7 +261,8 @@ class GUIllaume
 		@root = TkRoot.new { title "FAYDE Playback Experiment" }
 		@explorer=DialogueExplorer.new()
 
-		@content = TkFrame.new(@root).grid(:sticky => 'nsew')
+		@content = TkFrame.new(@root).grid(:sticky => 'new')
+		@resultsBox = TkFrame.new(@root).grid(:sticky => 'sew')
 
 		ph = { 'padx' => 10, 'pady' => 10 } 
 
@@ -267,35 +270,49 @@ class GUIllaume
 		TkGrid.columnconfigure @root, 0, :weight => 1; TkGrid.rowconfigure @root, 0, :weight => 1
 
 		@searchStr = TkVariable.new;
-		@searchStr.value="tip-top"
-		@searchBox = TkEntry.new(@content, 'width'=> 7, 'textvariable' => @searchStr).grid( :column => 2, :row => 1, :sticky => 'we' )
-
-	    # @entry = TkEntry.new(top, 'textvariable' => @text)
+		@searchStr.value="suresne"
+		@searchBox = TkEntry.new(@content, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :sticky => 'we' )
 
 		@searchResults = TkVariable.new
 		@resultsCount = TkVariable.new
 		@searchResults.value="pending"
-		TkLabel.new(@content, "textvariable" => @searchResults).grid( :column => 2, :row => 4, :sticky => 'we');
-		TkButton.new(@content, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 3, :sticky => 'w')
+		TkLabel.new(@content, "textvariable" => @searchResults).grid( :column => 1, :row => 4, :sticky=>"nsew");
 
-		TkLabel.new(@content) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'w')
-		TkLabel.new(@content) {text 'we found;'}.grid( :column => 1, :row => 2, :sticky => 'e')
-		TkLabel.new(@content) {text 'lines'}.grid( :column => 3, :row => 2, :sticky => 'w')
-		TkLabel.new(@content, "textvariable" => @resultsCount).grid( :column => 2, :row => 2, :sticky => 'we');
+		TkButton.new(@content, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
+
+		TkLabel.new(@content) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'e')
+		TkLabel.new(@content) {text 'we found;'}.grid( :column => 1, :row => 3, :sticky => 'e')
+		TkLabel.new(@content, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
+		TkLabel.new(@content) {text 'Dialogue Lines'}.grid( :column => 3, :row => 3, :sticky => 'w')
 	end
 
+	def lineSelect()
+		@nowLine=@lineSearch[@lineSelect.value.to_i]
+		# @resultsCount.value=@lineSelect
+
+		# stringLine=
+		@searchResults.value="selected: "+ @nowLine.to_s.slice(0,50)
+		# TkLabel.new(@content, "textvariable" => stringLine).grid( :column => 1, :row => 4, :sticky => 'e')
+	end
+
+
+
 	def makeSearchResults()
-		puts "makeSearchResults has executed"
 		searchStr=@searchStr.value
 		searchResults=""
-		objectSearch=@explorer.searchlines(searchStr)
-		@resultsCount.value=objectSearch.length
-		objectSearch.each do |result|
-			puts "ha ha, " + result.to_s
-
-			searchResults.concat(result.to_s+"\n")
+		@lineSearch=@explorer.searchlines(searchStr)
+		@resultsCount.value=@lineSearch.length
+		@lineSelect=TkVariable.new
+		# @lineSelect.value=0
+		@lineSearch.each_with_index do |result, i|
+			TkRadioButton.new(@resultsBox, "text" => result.to_s.slice(0,110), "variable" => @lineSelect, "value" =>i).grid( :column => 1, :row => i+2, :sticky=>"w")
+			# TkLabel.new(@resultsBox, "text"=>result.to_s.slice(0,110)).grid( :column => 2, :row => i+2, :sticky=>"e")
+			# TkButton.new(@resultsBox, "text"=> "select","command"=>lineSelect(i)).grid( :column => 1, :row => i+1, :sticky=>"w")
+			# searchResults.concat(result.to_s(true)+"\n")
 		end
-		@searchResults.value=searchResults
+		sel= proc{lineSelect}
+		TkButton.new(@content, "text"=> 'select', "command"=> sel).grid( :column => 3, :row => 4, :sticky => 'w')
+		# @searchResults.value=searchResults
 		# return searchResults
 	end
 
