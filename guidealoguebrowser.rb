@@ -15,12 +15,19 @@ class DialogueEntry
 
 		@actorid=dialogueArray[3]
 		actorname=$db.execute "SELECT name FROM actors WHERE id='#{@actorid}'";
-		@actor=actorname[0][0]
+		if actorname[0].nil? then
+			@actor=@actorid
+		else
+			@actor=actorname[0][0]
+		end
 
 		@conversantid=dialogueArray[4]
 		actorname=$db.execute "SELECT name FROM actors WHERE id='#{@conversantid}'";
-		@conversant=actorname[0][0]
-
+		if actorname[0].nil? then
+			@conversant=@conversantid
+		else
+			@conversant=actorname[0][0]
+		end
 		@conversationid=dialogueArray[5]
 		@isgroup=dialogueArray[6]
 		@hascheck=dialogueArray[7]
@@ -211,8 +218,7 @@ class DialogueExplorer
 	def nextlines()
 		@currentJob="next"
 
-		if lineSelected? then
-			@lineCollection.push(@nowLine)
+		if lineSelected? then			@lineCollection.push(@nowLine)
 			puts @nowLine.to_s
 			@nowOptions=@nowLine.getChildren()
 			@nowLine=nil
@@ -300,12 +306,17 @@ class GUIllaume
 	def makeSearchResults()
 		searchStr=@searchStr.value
 		searchResults=""
+		if @searchRadio.nil?
+			@searchRadio=[]
+		else
+			@searchRadio.each{|radiooption|	radiooption.destroy()};
+		end
 		@lineSearch=@explorer.searchlines(searchStr)
 		@resultsCount.value=@lineSearch.length
 		@lineSelect=TkVariable.new
 		# @lineSelect.value=0
 		@lineSearch.each_with_index do |result, i|
-			TkRadioButton.new(@resultsBox, "text" => result.to_s.slice(0,110), "variable" => @lineSelect, "value" =>i).grid( :column => 1, :row => i+2, :sticky=>"w")
+			@searchRadio[i]=TkRadioButton.new(@resultsBox, "text" => result.to_s.slice(0,110), "variable" => @lineSelect, "value" =>i).grid( :column => 1, :row => i+2, :sticky=>"w")
 			# TkLabel.new(@resultsBox, "text"=>result.to_s.slice(0,110)).grid( :column => 2, :row => i+2, :sticky=>"e")
 			# TkButton.new(@resultsBox, "text"=> "select","command"=>lineSelect(i)).grid( :column => 1, :row => i+1, :sticky=>"w")
 			# searchResults.concat(result.to_s(true)+"\n")
