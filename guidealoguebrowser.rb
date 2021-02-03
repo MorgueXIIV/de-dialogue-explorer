@@ -269,20 +269,23 @@ class GUIllaume
 		# @p1 = TkFrame.new(@notepan); # first page, which would get widgets gridded into it
 		# @p2 = TkFrame.new(@notepan); # second page
 		# @notepan.add(p1, :text => 'One')
-		# @notepan.add(p2, :text => 'Two')
+		# # @notepan.add(p2, :text => 'Two')
+		# @root['minsize'] = 50, 50
+		# @root['maxsize'] = 70, 70
 
 		@explorer=DialogueExplorer.new()
 
-		note = Tk::Tile::Notebook.new(@root) do
+		@note = Tk::Tile::Notebook.new(@root) do
 	   		height 310
 	   		place('height' => 600, 'width' => 600, 'x' => 10, 'y' => 10)
 		end		
-		@page1 = TkFrame.new(note)
-		@page2 = TkFrame.new(note)
-		f3 = TkFrame.new(note)		
-		note.add @page1, :text => 'Search'
-		note.add @page2, :text => 'Browse'
-		note.add f3, :text => 'To be determined', :state =>'disabled'
+		@page1 = TkFrame.new(@note)
+		@page2 = TkFrame.new(@note)
+		f3 = TkFrame.new(@note)		
+		@note.add @page1, :text => 'Search'
+		@note.add @page2, :text => 'Browse'
+		@note.add f3, :text => 'To be determined', :state =>'disabled'
+		@note.grid(:sticky => 'news')
 
 		@content = TkFrame.new(@page1).grid(:sticky => 'new')
 
@@ -298,7 +301,7 @@ class GUIllaume
 		@searchResults = TkVariable.new
 		@resultsCount = TkVariable.new
 		@searchResults.value="pending"
-		TkLabel.new(@content, "textvariable" => @searchResults).grid( :column => 1, :row => 4, :sticky=>"nsew");
+		TkLabel.new(@content, "textvariable" => @searchResults,"wraplength"=>300).grid( :column => 1, :row => 4, :sticky=>"nsew");
 
 		TkButton.new(@content, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
 
@@ -319,15 +322,14 @@ class GUIllaume
 			pack('fill' => 'x')
 		end
 
-		@searchlistbox.place('height' => 200,
-           'width'  => 300,
-           'x'      => 10,
-           'y'      => 10)
+		@searchlistbox.place('height' => 200,'width'  => 300, 'x'=> 10,'y'=> 10)
+		# @searchlistbox.grid(:column=>1, :row => 1, :sticky => "ne")
 
 		scroll = TkScrollbar.new(@resultsBox) do
 		   orient 'vertical'
 		   place('height' => 200, 'x' => 310, 'y'=>10)
 		end
+		# scroll.grid(:column=>2, :row => 1, :sticky => "nw")
 
 		@searchlistbox.bind('ButtonRelease-1', sel)
 
@@ -338,6 +340,15 @@ class GUIllaume
 		scroll.command(proc { |*args|
 		   @searchlistbox.yview(*args)
 		}) 
+
+		# PAGE 2:
+
+		@childsstring=TkVariable.new
+
+		@parentsstring=TkVariable.new
+		TkLabel.new(@page2, "textvariable" => @parentsstring, "wraplength"=>400).grid( :column => 1, :row => 1, :sticky => 'nw')
+		TkLabel.new(@page2, "textvariable" => @searchResults, "wraplength"=>400).grid( :column => 1, :row => 2, :sticky => 'w')
+		TkLabel.new(@page2, "textvariable" => @childsstring, "wraplength"=>400).grid( :column => 1, :row => 3, :sticky => 'sw')
 	end
 
 	def lineSelect()
@@ -355,22 +366,24 @@ class GUIllaume
 	end
 
 	def traceLine() 
+		@note.select(1)
 		if not @nowLine.nil?
 
 			children=@nowLine.getChildren()
-			childsstring=TkVariable.new
+			childsstring=""
 			children.each do |par|
-				childsstring.value+=par.to_s+"\n"
+				childsstring+=par.to_s(true)+"\n"
 			end
 
 			parents=@nowLine.getParents()
-			parentsstring=TkVariable.new
+			parentsstring=""
 			parents.each do |par|
-				parentsstring.value+=par.to_s+"\n"
+				parentsstring+=par.to_s(true)+"\n"
 			end
-			TkLabel.new(@page2, "textvariable" => parentsstring).grid( :column => 1, :row => 1, :sticky => 'w')
-			TkLabel.new(@page2, "textvariable" => @searchResults.value).grid( :column => 1, :row => 2, :sticky => 'w')
-			TkLabel.new(@page2, "textvariable" => childsstring).grid( :column => 1, :row => 3, :sticky => 'w')
+
+			@parentsstring.value=parentsstring
+			@childsstring.value=childsstring
+
 
 		end
 	end
