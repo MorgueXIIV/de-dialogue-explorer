@@ -265,10 +265,15 @@ end
 class GUIllaume
 	def initialize()
 		@root = TkRoot.new { title "FAYDE Playback Experiment" }
+		# @notepan = TkNotebook.new(@root)
+		# @p1 = TkFrame.new(@notepan); # first page, which would get widgets gridded into it
+		# @p2 = TkFrame.new(@notepan); # second page
+		# @notepan.add(p1, :text => 'One')
+		# @notepan.add(p2, :text => 'Two')
+
 		@explorer=DialogueExplorer.new()
 
 		@content = TkFrame.new(@root).grid(:sticky => 'new')
-		@resultsBox = TkFrame.new(@root).grid(:sticky => 'sew')
 
 		ph = { 'padx' => 10, 'pady' => 10 } 
 
@@ -276,7 +281,7 @@ class GUIllaume
 		TkGrid.columnconfigure @root, 0, :weight => 1; TkGrid.rowconfigure @root, 0, :weight => 1
 
 		@searchStr = TkVariable.new;
-		@searchStr.value="suresne"
+		@searchStr.value="tiptop"
 		@searchBox = TkEntry.new(@content, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :sticky => 'we' )
 
 		@searchResults = TkVariable.new
@@ -290,15 +295,59 @@ class GUIllaume
 		TkLabel.new(@content) {text 'we found;'}.grid( :column => 1, :row => 3, :sticky => 'e')
 		TkLabel.new(@content, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
 		TkLabel.new(@content) {text 'Dialogue Lines'}.grid( :column => 3, :row => 3, :sticky => 'w')
+
+		@resultsBox = TkFrame.new(@root, "width"=>200, "height"=>600).grid(:sticky => 'new')
+
+		sel= proc{lineSelect}
+		@searchlistbox = TkListbox.new(@resultsBox) do
+			listvariable @searchlist
+			width 20
+			height 15
+			setgrid 1
+			selectmode 'browse'
+			pack('fill' => 'x')
+		end
+
+		@searchlistbox.place('height' => 200,
+           'width'  => 300,
+           'x'      => 10,
+           'y'      => 10)
+
+		scroll = TkScrollbar.new(@resultsBox) do
+		   orient 'vertical'
+		   place('height' => 200, 'x' => 310, 'y'=>10)
+		end
+
+
+
+		@searchlistbox.bind('ButtonRelease-1', sel)
+
+
+		@searchlistbox.yscrollcommand(proc { |*args|
+		   scroll.set(*args)
+		})
+
+		scroll.command(proc { |*args|
+		   @searchlistbox.yview(*args)
+		}) 
 	end
 
 	def lineSelect()
-		@nowLine=@lineSearch[@lineSelect.value.to_i]
+		selected=@searchlistbox.curselection
+		if selected.length>0
+			selected=selected[0]
+			@nowLine=@lineSearch[selected]
+		# @lineSearch[@lineSelect.value.to_i]
 		# @resultsCount.value=@lineSelect
+		end
 
 		# stringLine=
-		@searchResults.value="selected: "+ @nowLine.to_s.slice(0,50)
+		@searchResults.value="selected: "+ @nowLine.to_s(true)
 		# TkLabel.new(@content, "textvariable" => stringLine).grid( :column => 1, :row => 4, :sticky => 'e')
+	end
+
+	def traceLine() 
+
 	end
 
 
@@ -306,23 +355,36 @@ class GUIllaume
 	def makeSearchResults()
 		searchStr=@searchStr.value
 		searchResults=""
-		if @searchRadio.nil?
-			@searchRadio=[]
-		else
-			@searchRadio.each{|radiooption|	radiooption.destroy()};
-		end
 		@lineSearch=@explorer.searchlines(searchStr)
 		@resultsCount.value=@lineSearch.length
-		@lineSelect=TkVariable.new
-		# @lineSelect.value=0
-		@lineSearch.each_with_index do |result, i|
-			@searchRadio[i]=TkRadioButton.new(@resultsBox, "text" => result.to_s.slice(0,110), "variable" => @lineSelect, "value" =>i).grid( :column => 1, :row => i+2, :sticky=>"w")
-			# TkLabel.new(@resultsBox, "text"=>result.to_s.slice(0,110)).grid( :column => 2, :row => i+2, :sticky=>"e")
-			# TkButton.new(@resultsBox, "text"=> "select","command"=>lineSelect(i)).grid( :column => 1, :row => i+1, :sticky=>"w")
-			# searchResults.concat(result.to_s(true)+"\n")
+		# @lineSelect=TkVariable.new
+
+		itemsinbox=@searchlistbox.size
+
+		if itemsinbox>0 then
+			# @searchlistbox.destroy()
+			for i in 1..@searchlistbox.size do
+				@searchlistbox.delete(0)
+			end
 		end
-		sel= proc{lineSelect}
-		TkButton.new(@content, "text"=> 'select', "command"=> sel).grid( :column => 3, :row => 4, :sticky => 'w')
+
+
+		@searchlist=TkVariable.new(@lineSearch)
+
+		# @searchlist.value=@lineSearch
+
+
+		@lineSearch.each{|result| @searchlistbox.insert "end", result}
+		# puts @searchlist.value.to_s
+
+		# @lineSearch.each_with_index do |result, i|
+		# 	@searchRadio[i]=TkRadioButton.new(@resultsBox, "text" => result.to_s(true).slice(0,250), "variable" => @lineSelect, "value" =>i, "command"=>sel).grid( :column => 1, :row => i+1, :sticky=>"w")
+
+
+		# trace the line?? Does nothing now
+
+		begintrace=proc{traceLine}
+		TkButton.new(@content, "text"=> 'trace line', "command"=> begintrace).grid( :column => 3, :row => 4, :sticky => 'w')
 		# @searchResults.value=searchResults
 		# return searchResults
 	end
