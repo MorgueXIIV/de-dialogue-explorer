@@ -40,7 +40,7 @@ class DialogueEntry
 
     def getParents()
     	if @parents.nil? or @parents.empty? then
-	    	idsArray=$db.execute"SELECT originconversationid/., origindialogueid FROM dlinks WHERE destinationconversationid='#{@conversationid}' AND destinationdialogueid='#{@id}'";
+	    	idsArray=$db.execute"SELECT originconversationid, origindialogueid FROM dlinks WHERE destinationconversationid='#{@conversationid}' AND destinationdialogueid='#{@id}'";
 	    	parentsList=[]
 	    	idsArray.each do |idPair|
 	    		parentsList.push(DialogueEntry.new(idPair[0],idPair[1]))
@@ -273,7 +273,18 @@ class GUIllaume
 
 		@explorer=DialogueExplorer.new()
 
-		@content = TkFrame.new(@root).grid(:sticky => 'new')
+		note = Tk::Tile::Notebook.new(@root) do
+	   		height 310
+	   		place('height' => 600, 'width' => 600, 'x' => 10, 'y' => 10)
+		end		
+		@page1 = TkFrame.new(note)
+		@page2 = TkFrame.new(note)
+		f3 = TkFrame.new(note)		
+		note.add @page1, :text => 'Search'
+		note.add @page2, :text => 'Browse'
+		note.add f3, :text => 'To be determined', :state =>'disabled'
+
+		@content = TkFrame.new(@page1).grid(:sticky => 'new')
 
 		ph = { 'padx' => 10, 'pady' => 10 } 
 
@@ -296,7 +307,7 @@ class GUIllaume
 		TkLabel.new(@content, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
 		TkLabel.new(@content) {text 'Dialogue Lines'}.grid( :column => 3, :row => 3, :sticky => 'w')
 
-		@resultsBox = TkFrame.new(@root, "width"=>200, "height"=>600).grid(:sticky => 'new')
+		@resultsBox = TkFrame.new(@page1, "width"=>200, "height"=>600).grid(:sticky => 'new')
 
 		sel= proc{lineSelect}
 		@searchlistbox = TkListbox.new(@resultsBox) do
@@ -318,10 +329,7 @@ class GUIllaume
 		   place('height' => 200, 'x' => 310, 'y'=>10)
 		end
 
-
-
 		@searchlistbox.bind('ButtonRelease-1', sel)
-
 
 		@searchlistbox.yscrollcommand(proc { |*args|
 		   scroll.set(*args)
@@ -343,11 +351,28 @@ class GUIllaume
 
 		# stringLine=
 		@searchResults.value="selected: "+ @nowLine.to_s(true)
-		# TkLabel.new(@content, "textvariable" => stringLine).grid( :column => 1, :row => 4, :sticky => 'e')
+
 	end
 
 	def traceLine() 
+		if not @nowLine.nil?
 
+			children=@nowLine.getChildren()
+			childsstring=TkVariable.new
+			children.each do |par|
+				childsstring.value+=par.to_s+"\n"
+			end
+
+			parents=@nowLine.getParents()
+			parentsstring=TkVariable.new
+			parents.each do |par|
+				parentsstring.value+=par.to_s+"\n"
+			end
+			TkLabel.new(@page2, "textvariable" => parentsstring).grid( :column => 1, :row => 1, :sticky => 'w')
+			TkLabel.new(@page2, "textvariable" => @searchResults.value).grid( :column => 1, :row => 2, :sticky => 'w')
+			TkLabel.new(@page2, "textvariable" => childsstring).grid( :column => 1, :row => 3, :sticky => 'w')
+
+		end
 	end
 
 
@@ -369,7 +394,7 @@ class GUIllaume
 		end
 
 
-		@searchlist=TkVariable.new(@lineSearch)
+		# @searchlist=TkVariable.new(@lineSearch)
 
 		# @searchlist.value=@lineSearch
 
