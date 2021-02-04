@@ -276,8 +276,9 @@ class GUIllaume
 		@explorer=DialogueExplorer.new()
 
 		@note = Tk::Tile::Notebook.new(@root) do
-	   		height 310
-	   		place('height' => 600, 'width' => 600, 'x' => 10, 'y' => 10)
+	   		height 610
+	   		width 600
+	   		# place('height' => 600, 'width' => 600, 'x' => 10, 'y' => 10)
 		end		
 		@page1 = TkFrame.new(@note)
 		@page2 = TkFrame.new(@note)
@@ -287,7 +288,7 @@ class GUIllaume
 		@note.add f3, :text => 'To be determined', :state =>'disabled'
 		@note.grid(:sticky => 'news')
 
-		@content = TkFrame.new(@page1).grid(:sticky => 'new')
+		@searchEntry = TkFrame.new(@page1).grid(:sticky => 'new')
 
 		ph = { 'padx' => 10, 'pady' => 10 } 
 
@@ -296,40 +297,39 @@ class GUIllaume
 
 		@searchStr = TkVariable.new;
 		@searchStr.value="tiptop"
-		@searchBox = TkEntry.new(@content, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :sticky => 'we' )
+		TkLabel.new(@searchEntry) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'e')
+		TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wes' )
+		TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
 
-		@searchResults = TkVariable.new
+		@selectedLine = TkVariable.new
 		@resultsCount = TkVariable.new
-		@searchResults.value="pending"
-		TkLabel.new(@content, "textvariable" => @searchResults,"wraplength"=>300).grid( :column => 1, :row => 4, :sticky=>"nsew");
+		@selectedLine.value="pending"
+		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>300, "height"=>5).grid( :column => 1, :row => 4, :sticky=>"nsw");
 
-		TkButton.new(@content, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
+		TkLabel.new(@searchEntry) {text 'we found;'}.grid( :column => 1, :row => 3, :sticky => 'e')
+		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
+		TkLabel.new(@searchEntry) {text 'Dialogue Lines'}.grid( :column => 3, :row => 3, :sticky => 'w')
 
-		TkLabel.new(@content) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'e')
-		TkLabel.new(@content) {text 'we found;'}.grid( :column => 1, :row => 3, :sticky => 'e')
-		TkLabel.new(@content, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
-		TkLabel.new(@content) {text 'Dialogue Lines'}.grid( :column => 3, :row => 3, :sticky => 'w')
-
-		@resultsBox = TkFrame.new(@page1, "width"=>200, "height"=>600).grid(:sticky => 'new')
+		@resultsBox = TkFrame.new(@page1).grid(:sticky => 'sew')
 
 		sel= proc{lineSelect}
 		@searchlistbox = TkListbox.new(@resultsBox) do
 			listvariable @searchlist
 			width 20
-			height 15
+			height 10
 			setgrid 1
 			selectmode 'browse'
-			pack('fill' => 'x')
+			# pack('fill' => 'x')
 		end
 
-		@searchlistbox.place('height' => 200,'width'  => 300, 'x'=> 10,'y'=> 10)
-		# @searchlistbox.grid(:column=>1, :row => 1, :sticky => "ne")
+		# @searchlistbox.place('height' => 200,'width'  => 300, 'x'=> 10,'y'=> 10)
+		@searchlistbox.grid(:column=>1, :row => 1, :sticky => "sewn", :columnspan => 3)
 
 		scroll = TkScrollbar.new(@resultsBox) do
 		   orient 'vertical'
-		   place('height' => 200, 'x' => 310, 'y'=>10)
+		   # place('height' => 200, 'x' => 310, 'y'=>10)
 		end
-		# scroll.grid(:column=>2, :row => 1, :sticky => "nw")
+		scroll.grid(:column=>5, :row => 1, :sticky => "news")
 
 		@searchlistbox.bind('ButtonRelease-1', sel)
 
@@ -344,11 +344,12 @@ class GUIllaume
 		# PAGE 2:
 
 		@childsstring=TkVariable.new
-
 		@parentsstring=TkVariable.new
+		# @pickmeline=TkVariable.new
 		TkLabel.new(@page2, "textvariable" => @parentsstring, "wraplength"=>400).grid( :column => 1, :row => 1, :sticky => 'nw')
-		TkLabel.new(@page2, "textvariable" => @searchResults, "wraplength"=>400).grid( :column => 1, :row => 2, :sticky => 'w')
+		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 1, :row => 2, :sticky => 'w')
 		TkLabel.new(@page2, "textvariable" => @childsstring, "wraplength"=>400).grid( :column => 1, :row => 3, :sticky => 'sw')
+		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
 	end
 
 	def lineSelect()
@@ -356,23 +357,29 @@ class GUIllaume
 		if selected.length>0
 			selected=selected[0]
 			@nowLine=@lineSearch[selected]
-		# @lineSearch[@lineSelect.value.to_i]
-		# @resultsCount.value=@lineSelect
 		end
-
-		# stringLine=
-		@searchResults.value="selected: "+ @nowLine.to_s(true)
+		@selectedLine.value="selected: "+ @nowLine.to_s(true)
 
 	end
 
 	def traceLine() 
 		@note.select(1)
 		if not @nowLine.nil?
+			setchild=proc{@childsstring.value=@nowLine.getChildren[0].to_s}
 
 			children=@nowLine.getChildren()
-			childsstring=""
-			children.each do |par|
-				childsstring+=par.to_s(true)+"\n"
+
+			if @childrenButtons.nil? or @childrenButtons.empty? then
+				@childrenButtons=Array.new()
+			else
+				@childrenButtons.each do |butter| 
+					butter.destroy()
+				end
+			end
+			@chbuttoncommands=Array.new(children.length) { |i| proc{@childsstring.value=@nowLine.getChildren[i].to_s} }
+			children.each_with_index do |par, i|
+				@childrenButtons.push(TkButton.new(@page2, "text"=> par.to_s(true), "command" => @chbuttoncommands[i],"wraplength"=>40))
+				@childrenButtons[i].grid(:row =>3, :column => i, :sticky => 'ns')
 			end
 
 			parents=@nowLine.getParents()
@@ -382,7 +389,7 @@ class GUIllaume
 			end
 
 			@parentsstring.value=parentsstring
-			@childsstring.value=childsstring
+			# @childsstring.value=childsstring
 
 
 		end
@@ -400,10 +407,10 @@ class GUIllaume
 		itemsinbox=@searchlistbox.size
 
 		if itemsinbox>0 then
-			# @searchlistbox.destroy()
-			for i in 1..@searchlistbox.size do
-				@searchlistbox.delete(0)
-			end
+			@searchlistbox.delete(0, :end)
+			# for i in 1..@searchlistbox.size do
+			# 	@searchlistbox.delete(0)
+			# end
 		end
 
 
@@ -422,8 +429,8 @@ class GUIllaume
 		# trace the line?? Does nothing now
 
 		begintrace=proc{traceLine}
-		TkButton.new(@content, "text"=> 'trace line', "command"=> begintrace).grid( :column => 3, :row => 4, :sticky => 'w')
-		# @searchResults.value=searchResults
+		TkButton.new(@searchEntry, "text"=> 'trace line', "command"=> begintrace).grid( :column => 3, :row => 4, :sticky => 'w')
+		# @selectedLine.value=searchResults
 		# return searchResults
 	end
 
