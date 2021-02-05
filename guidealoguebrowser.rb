@@ -303,8 +303,11 @@ class GUIllaume
 
 		@selectedLine = TkVariable.new
 		@resultsCount = TkVariable.new
-		@selectedLine.value="pending"
-		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>300, "height"=>5).grid( :column => 1, :row => 4, :sticky=>"nsw");
+		@selectedLine.value="Select a Line To View More Details Here"
+		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>400, "height"=>5).grid( :column => 1, :columnspan=>3, :row => 4, :sticky=>"nsw");
+
+		begintrace=proc{traceLine}
+		@traceButton = TkButton.new(@searchEntry, "text"=> 'trace   line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>50).grid( :column => 4, :row => 4, :sticky => 'w')
 
 		TkLabel.new(@searchEntry) {text 'we found;'}.grid( :column => 1, :row => 3, :sticky => 'e')
 		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
@@ -319,6 +322,7 @@ class GUIllaume
 			height 10
 			setgrid 1
 			selectmode 'browse'
+			state "disabled"
 			# pack('fill' => 'x')
 		end
 
@@ -347,8 +351,8 @@ class GUIllaume
 		@parentsstring=TkVariable.new
 		# @pickmeline=TkVariable.new
 		TkLabel.new(@page2, "textvariable" => @parentsstring, "wraplength"=>400).grid( :column => 1, :row => 1, :sticky => 'nw')
-		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 1, :row => 2, :sticky => 'w')
-		TkLabel.new(@page2, "textvariable" => @childsstring, "wraplength"=>400).grid( :column => 1, :row => 3, :sticky => 'sw')
+		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 1, :row => 3, :sticky => 'w')
+		TkLabel.new(@page2, "textvariable" => @childsstring, "wraplength"=>400).grid( :column => 1, :row => 5, :sticky => 'sw')
 		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
 	end
 
@@ -357,9 +361,9 @@ class GUIllaume
 		if selected.length>0
 			selected=selected[0]
 			@nowLine=@lineSearch[selected]
+			@selectedLine.value="selected: "+ @nowLine.to_s(true)
+			@traceButton.state="active"
 		end
-		@selectedLine.value="selected: "+ @nowLine.to_s(true)
-
 	end
 
 	def traceLine() 
@@ -368,6 +372,7 @@ class GUIllaume
 			setchild=proc{@childsstring.value=@nowLine.getChildren[0].to_s}
 
 			children=@nowLine.getChildren()
+			puts children.length
 
 			if @childrenButtons.nil? or @childrenButtons.empty? then
 				@childrenButtons=Array.new()
@@ -375,11 +380,14 @@ class GUIllaume
 				@childrenButtons.each do |butter| 
 					butter.destroy()
 				end
+				@childrenButtons=Array.new()
+				@chbuttoncommands=[]
 			end
+
 			@chbuttoncommands=Array.new(children.length) { |i| proc{@childsstring.value=@nowLine.getChildren[i].to_s} }
 			children.each_with_index do |par, i|
-				@childrenButtons.push(TkButton.new(@page2, "text"=> par.to_s(true), "command" => @chbuttoncommands[i],"wraplength"=>40))
-				@childrenButtons[i].grid(:row =>3, :column => i, :sticky => 'ns')
+				@childrenButtons.push(TkButton.new(@page2, "text"=> par.to_s(true), "command" => @chbuttoncommands[i],"wraplength"=>100))
+				@childrenButtons[i].grid(:row =>4, :column => i, :sticky => 'ns')
 			end
 
 			parents=@nowLine.getParents()
@@ -389,7 +397,7 @@ class GUIllaume
 			end
 
 			@parentsstring.value=parentsstring
-			# @childsstring.value=childsstring
+			@childsstring.value=""
 
 
 		end
@@ -398,40 +406,26 @@ class GUIllaume
 
 
 	def makeSearchResults()
+		@searchlistbox.state="normal"
 		searchStr=@searchStr.value
 		searchResults=""
 		@lineSearch=@explorer.searchlines(searchStr)
 		@resultsCount.value=@lineSearch.length
-		# @lineSelect=TkVariable.new
 
 		itemsinbox=@searchlistbox.size
 
 		if itemsinbox>0 then
 			@searchlistbox.delete(0, :end)
-			# for i in 1..@searchlistbox.size do
-			# 	@searchlistbox.delete(0)
-			# end
 		end
 
-
-		# @searchlist=TkVariable.new(@lineSearch)
-
-		# @searchlist.value=@lineSearch
-
-
 		@lineSearch.each{|result| @searchlistbox.insert "end", result}
-		# puts @searchlist.value.to_s
 
 		# @lineSearch.each_with_index do |result, i|
 		# 	@searchRadio[i]=TkRadioButton.new(@resultsBox, "text" => result.to_s(true).slice(0,250), "variable" => @lineSelect, "value" =>i, "command"=>sel).grid( :column => 1, :row => i+1, :sticky=>"w")
 
 
-		# trace the line?? Does nothing now
 
-		begintrace=proc{traceLine}
-		TkButton.new(@searchEntry, "text"=> 'trace line', "command"=> begintrace).grid( :column => 3, :row => 4, :sticky => 'w')
 		# @selectedLine.value=searchResults
-		# return searchResults
 	end
 
 end
