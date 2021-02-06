@@ -271,16 +271,24 @@ begin
 	
 	talkyArray = Array(0..408)
 
-		db.transaction
-		for currentActor in Array(0..408)
-			lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
-			lineCount = lineCount[0][0]
-			talkyArray[currentActor] = lineCount
-		end
-		db.commit
-		for currentActor in Array(0..408)
-			db.execute "UPDATE actors SET talkativeness = #{talkyArray[currentActor]} WHERE id = #{currentActor}"
-		end
+	db.transaction
+	lineArray = talkyArray.map{|i| db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{i}"}
+	db.commit
+
+	lineArray.each_with_index do |value, i|
+		db.execute "UPDATE actors SET talkativeness = #{value.flatten.join.to_i} WHERE id = #{i}"
+	end
+
+	# 	db.transaction
+	# 	for currentActor in Array(0..408)
+	# 		lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
+	# 		lineCount = lineCount[0][0]
+	# 		talkyArray[currentActor] = lineCount
+	# 	end
+	# 	db.commit
+	# 	for currentActor in Array(0..408)
+	# 		db.execute "UPDATE actors SET talkativeness = #{talkyArray[currentActor]} WHERE id = #{currentActor}"
+	# 	end
 
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 rescue SQLite3::Exception => e 
