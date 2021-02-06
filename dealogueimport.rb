@@ -272,13 +272,16 @@ begin
 	talkyArray = Array(0..408)
 
 	db.transaction
+	
 	lineArray = talkyArray.map{|i| db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{i}"}
 	db.commit
 
 	lineArray.each_with_index do |value, i|
-		db.execute "UPDATE actors SET talkativeness = #{value.flatten.join.to_i} WHERE id = #{i}"
+		db.execute "UPDATE actors SET talkativeness = #{value[0][0]} WHERE id = #{i}"
 	end
-
+	# talkyArray.each_with_index do |value, i|
+	# 	value = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{i}"
+	# 	value = value[0][0]
 	# 	db.transaction
 	# 	for currentActor in Array(0..408)
 	# 		lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
