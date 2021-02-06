@@ -295,6 +295,7 @@ begin
 	puts "updated #{numberOfdbEntriesUpdated} records from the databases";
 	puts "Database creation/updates took #{timetaken} seconds"
 
+
 rescue SQLite3::Exception => e 
     puts "there was a Database Creation error: " + e.to_s;
     #Rollback prevents partially complete data sets being inserted
