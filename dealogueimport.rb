@@ -94,37 +94,37 @@ begin
 	dealogues=JSON.parse(json);
 
 	$articyIDskills=Hash["0x0100000400000918"=>"Conceptualization",
-"0x0100000400000767"=>"Logic",
-"0x010000040000076B"=>"Encyclopedia",
-"0x0100000A00000016"=>"Rhetoric",
-"0x0100000A0000001A"=>"Drama",
-"0x0100000A0000001E"=>"Visual Calculus",
-"0x0100000400000773"=>"Empathy",
-"0x010000040000076F"=>"Inland Empire",
-"0x0100000A0000003E"=>"Volition",
-"0x0100000A00000042"=>"Authority",
-"0x0100000A00000046"=>"Suggestion",
-"0x0100000A0000004A"=>"Esprit de Corps",
-"0x01000004000009A7"=>"Endurance",
-"0x0100000400000B11"=>"Physical Instrument",
-"0x0100000400000BC7"=>"Shivers",
-"0x0100000A00000022"=>"Pain Threshold",
-"0x0100000A00000026"=>"Electrochemistry",
-"0x01000011000010D8"=>"Half Light",
-"0x0100000A0000002A"=>"Hand/Eye Coordination",
-"0x0100000A0000002E"=>"Reaction Speed",
-"0x0100000A00000032"=>"Savoir Faire",
-"0x0100000A00000036"=>"Interfacing",
-"0x0100000A0000003A"=>"Composure",
-"0x0100000400000BC3"=>"Perception",
-"0x0100000800000BAC"=>"Perception (Smell)",
-"0x0100000800000BB0"=>"Perception (Hearing)",
-"0x0100000800000BB8"=>"Perception (Taste)",
-"0x0100000800000BBC"=>"Perception (Sight)",
-"0x0100005200000001"=>"Psyche",
-"0x0100005200000005"=>"Motorics",
-"0x0100005200000009"=>"Intellect",
-"0x010000520000000D"=>"Fysique",]
+	"0x0100000400000767"=>"Logic",
+	"0x010000040000076B"=>"Encyclopedia",
+	"0x0100000A00000016"=>"Rhetoric",
+	"0x0100000A0000001A"=>"Drama",
+	"0x0100000A0000001E"=>"Visual Calculus",
+	"0x0100000400000773"=>"Empathy",
+	"0x010000040000076F"=>"Inland Empire",
+	"0x0100000A0000003E"=>"Volition",
+	"0x0100000A00000042"=>"Authority",
+	"0x0100000A00000046"=>"Suggestion",
+	"0x0100000A0000004A"=>"Esprit de Corps",
+	"0x01000004000009A7"=>"Endurance",
+	"0x0100000400000B11"=>"Physical Instrument",
+	"0x0100000400000BC7"=>"Shivers",
+	"0x0100000A00000022"=>"Pain Threshold",
+	"0x0100000A00000026"=>"Electrochemistry",
+	"0x01000011000010D8"=>"Half Light",
+	"0x0100000A0000002A"=>"Hand/Eye Coordination",
+	"0x0100000A0000002E"=>"Reaction Speed",
+	"0x0100000A00000032"=>"Savoir Faire",
+	"0x0100000A00000036"=>"Interfacing",
+	"0x0100000A0000003A"=>"Composure",
+	"0x0100000400000BC3"=>"Perception",
+	"0x0100000800000BAC"=>"Perception (Smell)",
+	"0x0100000800000BB0"=>"Perception (Hearing)",
+	"0x0100000800000BB8"=>"Perception (Taste)",
+	"0x0100000800000BBC"=>"Perception (Sight)",
+	"0x0100005200000001"=>"Psyche",
+	"0x0100005200000005"=>"Motorics",
+	"0x0100005200000009"=>"Intellect",
+	"0x010000520000000D"=>"Fysique",]
 
 
 	# opens a DB file, Creates our database tables	
@@ -168,8 +168,8 @@ begin
 	variable TEXT, modifier INT, tooltip TEXT,
   	FOREIGN KEY (conversationid,dialogueid) REFERENCES checks(conversationid, dialogueid))""";
 
-# these strings represent the various keys we need from each hash to fed into the database
-# stored in an ITERABLE array so we can easily use them in a method for a nice DRY grab of data to insert
+	# these strings represent the various keys we need from each hash to fed into the database
+	# stored in an ITERABLE array so we can easily use them in a method for a nice DRY grab of data to insert
 	listOfLineAtts=["id","Title","Dialogue Text","Sequence","Actor","Conversant","conversationID", "difficultyPass","isGroup","conditionsString","userScript"]
 	listOfConvoAtts=["id", "Title", "Description","Actor","Conversant"]
 	listOfLinkAtts=["originConversationID","originDialogueID","destinationConversationID","destinationDialogueID","isConnector","priority"]
@@ -183,7 +183,7 @@ begin
 	doChecks=true
 	doModifiers=true
 
-#inistialise counter
+	#inistialise counter
 	numberOfdbEntriesMade=0;
 	#using transactions means the database is written to all at once making all these entries
 	#which is MUCH much faster in SQLite than making a committed transation for each of the 10,000 + entries
@@ -268,13 +268,18 @@ begin
 
 	#adds a value to talkativeness in actors table with the number of lines they've said 
 	#for every actor in the actors table, counts how many times their id appears in the actor column in the dentries table
-		db = SQLite3::Database.open 'test.db'
+	
+	talkyArray = Array(0..408)
 
+		db.transaction
 		for currentActor in Array(0..408)
 			lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
 			lineCount = lineCount[0][0]
-			db.execute "UPDATE actors SET talkativeness = #{lineCount} WHERE id = #{currentActor}"
-			numberOfdbEntriesMade+=1;
+			talkyArray[currentActor] = lineCount
+		end
+		db.commit
+		for currentActor in Array(0..408)
+			db.execute "UPDATE actors SET talkativeness = #{talkyArray[currentActor]} WHERE id = #{currentActor}"
 		end
 
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
