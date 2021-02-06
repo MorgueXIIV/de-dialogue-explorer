@@ -266,6 +266,17 @@ begin
 	end
 	db.commit
 
+	#adds a value to talkativeness in actors table with the number of lines they've said 
+	#for every actor in the actors table, counts how many times their id appears in the actor column in the dentries table
+		db = SQLite3::Database.open 'test.db'
+
+		for currentActor in Array(0..408)
+			lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
+			lineCount = lineCount[0][0]
+			db.execute "UPDATE actors SET talkativeness = #{lineCount} WHERE id = #{currentActor}"
+			numberOfdbEntriesMade+=1;
+		end
+
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 rescue SQLite3::Exception => e 
     puts "there was a Database Creation error: " + e.to_s;
