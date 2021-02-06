@@ -90,6 +90,8 @@ end
 #reads in and parses the JSON
 #TEST NEW ERROR HANDLING PLS
 begin
+	starttime=Time.now()
+
 	json= File.read('Disco Elysium Cut.json');
 	dealogues=JSON.parse(json);
 
@@ -174,17 +176,19 @@ begin
 	listOfConvoAtts=["id", "Title", "Description","Actor","Conversant"]
 	listOfLinkAtts=["originConversationID","originDialogueID","destinationConversationID","destinationDialogueID","isConnector","priority"]
 
+
 	# CHANGE THESE VALUES IN THE SCRIPT TO ENABLE/DISABLE
 	# POPULATING CERTAIN TABLES
-	doActors=true
-	doDialogues=true
-	doDentries=true
-	doDlinks=true
-	doChecks=true
-	doModifiers=true
+	doActors=false
+	doDialogues=false
+	doDentries=false
+	doDlinks=false
+	doChecks=false
+	doModifiers=false
 
 	#inistialise counter
 	numberOfdbEntriesMade=0;
+	numberOfdbEntriesUpdated=0
 	#using transactions means the database is written to all at once making all these entries
 	#which is MUCH much faster in SQLite than making a committed transation for each of the 10,000 + entries
 	db.transaction
@@ -266,31 +270,31 @@ begin
 	end
 	db.commit
 
+	puts "inserted #{numberOfdbEntriesMade} records into the databases";
+
 	#adds a value to talkativeness in actors table with the number of lines they've said 
 	#for every actor in the actors table, counts how many times their id appears in the actor column in the dentries table
+
+	talkyArray=[]
 	
-	talkyArray = Array(0..408)
-
-	db.transaction
-	lineArray = talkyArray.map{|i| db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{i}"}
-	db.commit
-
-	lineArray.each_with_index do |value, i|
-		db.execute "UPDATE actors SET talkativeness = #{value.flatten.join.to_i} WHERE id = #{i}"
+	for currentActor in Array(0..408)
+		lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
+		lineCount = lineCount[0][0]
+		talkyArray[currentActor] = lineCount
 	end
 
-	# 	db.transaction
-	# 	for currentActor in Array(0..408)
-	# 		lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
-	# 		lineCount = lineCount[0][0]
-	# 		talkyArray[currentActor] = lineCount
-	# 	end
-	# 	db.commit
-	# 	for currentActor in Array(0..408)
-	# 		db.execute "UPDATE actors SET talkativeness = #{talkyArray[currentActor]} WHERE id = #{currentActor}"
-	# 	end
+	db.transaction
+	talkyArray.each_with_index do |value, i|
+		db.execute "UPDATE actors SET talkativeness = #{value} WHERE id = #{i}"
+		numberOfdbEntriesUpdated+=1
+	end
+	db.commit
 
-	puts "inserted #{numberOfdbEntriesMade} records into the databases";
+	endtime=Time.now()
+	timetaken=endtime - starttime
+	puts "updated #{numberOfdbEntriesUpdated} records from the databases";
+	puts "Database creation/updates took #{timetaken} seconds"
+
 rescue SQLite3::Exception => e 
     puts "there was a Database Creation error: " + e.to_s;
     #Rollback prevents partially complete data sets being inserted

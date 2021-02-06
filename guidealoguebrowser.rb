@@ -103,8 +103,8 @@ class DialogueExplorer
 		@nowLine=nil
 		@lineCollection=Array.new()
 		@nowOptions=Array.new()
+		@searchOptions=Array.new()
 		@nowJob=""
-		output()
 	end
 
 	def optionsAvail?()
@@ -115,16 +115,58 @@ class DialogueExplorer
 		end
 	end
 
-	def output()
-		puts "Thank You For Using the".colorize(:light_green) + " FAYDE Playback Experiment!".colorize(:yellow)
+	def outputLineCollection()
+		lineCollStr = ""
 		@lineCollection.each do |line|
-			puts line.to_s
+			lineCollStr+= line.to_s + "\n"
 		end
+		return lineCollStr
+	end
+
+	def getCurrentLineStr(lomg=false)
+		return @nowLine.to_s(lomg)
+	end
+
+	def getSearchOptStrs(lomg=false)
+		countOpts=@searchOptions.length
+		if countOpts>0 then
+			optStrs=Array.new(10) { |i| @searchOptions[i].to_s(lomg) }
+		end
+		return optStrs
+	end
+
+
+	def getForwardOptStrs(lomg=false)
+		countOpts=@forwOptions.length
+		if countOpts>0 then
+			optStrs=Array.new(countOpts) { |i| @forwOptions[i].to_s(lomg) }
+		else
+			optStrs=[]
+		end
+		return optStrs
+	end
+
+	def getBackwardOptStrs(lomg=false)
+		countOpts=@backOptions.length
+		if countOpts>0 then
+			optStrs=Array.new(countOpts) { |i| @backOptions[i].to_s(lomg) }
+		else
+			optStrs=[]
+		end
+		return optStrs
 	end
 
 	def lineSelected?()
 		# TODO refactor to use a method that returns true if it's a dialogue line that I'll add to that class
 		return !(@nowLine.nil?)
+	end
+
+	def collectionStarted()
+		if @lineCollection.empty? or @lineCollection.nil? then
+			return false
+		else
+			return true
+		end
 	end
 
 	def choiceprocess()
@@ -169,6 +211,7 @@ class DialogueExplorer
 		return optionnum
 	end
 
+	# TODO refactor to RETURN not print the dump
 	def dialoguedump()
 		if @nowLine.nil?
 			puts "What conversation is this?"
@@ -186,6 +229,7 @@ class DialogueExplorer
 		end
 	end 
 
+	# refactor to RETURN not output
 	def conversationinfo()
 		if @nowLine.nil?
 			puts "Which conversation ID?"
@@ -201,24 +245,125 @@ class DialogueExplorer
 
 	def searchlines(searchQ=nil)
 		if searchQ.nil? or searchQ.length<3
-			#receive text input from command line, remove " and 's with GSUB"
+			#receive text input from command line,
 			puts "Enter search query: (over 3 chars)"
 			searchQ=gets.chomp
 		end
+		#  remove " and 's with GSUB"
 		searchQ.gsub!("'", "_")
 		searchQ.gsub!('"', "_")
-				#us SQL query to get the line IDs when they partial match the provided input string.
+		#us SQL query to get the line IDs when they partial match the provided input string.
 		searchDias=$db.execute "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%' limit 100";
 		#iterates over array of results, getting objects based on their id
-		@nowOptions=[]
-		searchDias.each {|dia| @nowOptions.push(DialogueEntry.new(dia[0],dia[1]))}
-		return @nowOptions;
+		@searchOptions=[]
+		searchDias.each do |dia|
+			@searchOptions.push(DialogueEntry.new(dia[0],dia[1]))
+		end
+		optionsStrs=getSearchOptStrs
+		return optionsStrs
+	end
+
+	def selectSearchOption(optToSelect)
+		selOpt=@searchOptions[optToSelect]
+		if selOpt.nil?
+			return false
+		else
+			@lineCollection=[]
+			@lineCollection.push(selOpt)
+		end
+		return selOpt.to_s(true)
+	end
+
+	# TODO implement If Needed
+	def selectForwTraceOpt(optToSelect)
+		selOpt=@forwOptions[optToSelect]
+		if selOpt.nil?
+			return false
+		else
+			return @lineCollection.last.to_s(true)
+		end
+	end
+
+	def selectBackTraceOpt(optToSelect)
+		selOpt=@BackOptions[optToSelect]
+		if selOpt.nil?
+			return false
+		else
+			traceBackOrForth(true,selOpt)
+			return true
+		end
+	end
+
+	def traceBackOrForth(backw=false)
+		if collectionStarted then
+			if backw then
+				lineToWorkOn = @lineCollection.first
+				# @lineCollection.unshift(lineToAdd)
+				nowOptions=lineToWorkOn.getParents()
+			else
+				lineToWorkOn = @lineCollection.last
+				# @lineCollection.push(lineToAdd)
+				nowOptions=lineToWorkOn.getChildren()
+			end
+
+			if backw then
+			else
+			end
+		else
+			raise "No Starting Point In Line Collection."
+		end
+
+		if nowOptions.length==1
+			if backw then
+				@lineCollection.unshift(nowOptions[0])
+			else
+				@lineCollection.push(nowOptions[0])
+			end
+			traceBackOrForth(backw)
+		elsif backw
+			@backOptions=nowOptions
+		else 
+			@forwOptions=nowOptions
+		end
+	end
+
+	def traceBackAndForth()
+		if @lineCollection.empty? or @lineCollection.nil? then
+			raise "No Starting Point In Line Collection."
+		else
+			if backw then
+				lineToWorkOn = @lineCollection.first
+				# @lineCollection.unshift(lineToAdd)
+				nowOptions=lineToAdd.getParents()
+			else
+				lineToWorkOn = @lineCollection.last
+				# @lineCollection.push(lineToAdd)
+				nowOptions=lineToAdd.getChildren()
+			end
+
+			if backw then
+			else
+			end
+		end
+
+		if nowOptions.length==1
+			if backw then
+				@lineCollection.unshift(nowOptions[0])
+			else				
+				@lineCollection.push(nowOptions[0])
+			end
+			traceBackOrForth(backw)
+		elsif backw
+			@backOptions=nowOptions
+		else 
+			@forwOptions=nowOptions
+		end
 	end
 
 	def nextlines()
 		@currentJob="next"
-
-		if lineSelected? then			@lineCollection.push(@nowLine)
+		if lineSelected? then
+			@lineCollection.push(@nowLine)
 			puts @nowLine.to_s
 			@nowOptions=@nowLine.getChildren()
 			@nowLine=nil
@@ -350,6 +495,8 @@ class GUIllaume
 		@childsstring=TkVariable.new
 		@parentsstring=TkVariable.new
 		# @pickmeline=TkVariable.new
+		@conversationSoFar=TkVariable.new
+
 		TkLabel.new(@page2, "textvariable" => @parentsstring, "wraplength"=>400).grid( :column => 1, :row => 1, :sticky => 'nw')
 		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 1, :row => 3, :sticky => 'w')
 		TkLabel.new(@page2, "textvariable" => @childsstring, "wraplength"=>400).grid( :column => 1, :row => 5, :sticky => 'sw')
@@ -360,37 +507,37 @@ class GUIllaume
 		selected=@searchlistbox.curselection
 		if selected.length>0
 			selected=selected[0]
-			@nowLine=@lineSearch[selected]
-			@selectedLine.value="selected: "+ @nowLine.to_s(true)
+			selectedStr=@explorer.selectSearchOption(selected)
+			@selectedLine.value="selected: #{selectedStr}"
 			@traceButton.state="active"
 		end
 	end
 
-	def traceLine() 
+	def traceLine()
 		@note.select(1)
-		if not @nowLine.nil?
-			setchild=proc{@childsstring.value=@nowLine.getChildren[0].to_s}
-
-			children=@nowLine.getChildren()
+		if @explorer.collectionStarted
+			# setchild=proc{@childsstring.value=@nowLine.getChildren[0].to_s}
+			@explorer.traceBackOrForth(false)
+			children=@explorer.getForwardOptStrs
 			puts children.length
 
 			if @childrenButtons.nil? or @childrenButtons.empty? then
-				@childrenButtons=Array.new()
+				@childrenButtons=[]
 			else
 				@childrenButtons.each do |butter| 
 					butter.destroy()
 				end
-				@childrenButtons=Array.new()
+				@childrenButtons=[]
 				@chbuttoncommands=[]
 			end
 
-			@chbuttoncommands=Array.new(children.length) { |i| proc{@childsstring.value=@nowLine.getChildren[i].to_s} }
+			@chbuttoncommands=Array.new(children.length) { |i| proc{@childsstring.value=@explorer.selectForwTraceOpt(i);traceLine} }
 			children.each_with_index do |par, i|
-				@childrenButtons.push(TkButton.new(@page2, "text"=> par.to_s(true), "command" => @chbuttoncommands[i],"wraplength"=>100))
+				@childrenButtons.push(TkButton.new(@page2, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
 				@childrenButtons[i].grid(:row =>4, :column => i, :sticky => 'ns')
 			end
 
-			parents=@nowLine.getParents()
+			parents=[]
 			parentsstring=""
 			parents.each do |par|
 				parentsstring+=par.to_s(true)+"\n"
@@ -419,15 +566,7 @@ class GUIllaume
 		end
 
 		@lineSearch.each{|result| @searchlistbox.insert "end", result}
-
-		# @lineSearch.each_with_index do |result, i|
-		# 	@searchRadio[i]=TkRadioButton.new(@resultsBox, "text" => result.to_s(true).slice(0,250), "variable" => @lineSelect, "value" =>i, "command"=>sel).grid( :column => 1, :row => i+1, :sticky=>"w")
-
-
-
-		# @selectedLine.value=searchResults
 	end
-
 end
 
 
