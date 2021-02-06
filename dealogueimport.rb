@@ -265,6 +265,7 @@ begin
 		end
 	end
 	db.commit
+
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 rescue SQLite3::Exception => e 
     puts "there was a Database Creation error: " + e.to_s;
