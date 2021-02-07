@@ -129,7 +129,8 @@ class DialogueExplorer
 		choice = gets.chomp
 		case choice
 		when "q"
-			# self.output
+			self.output
+			exit
 		when "n"
 			self.nextlines
 		when "p"
@@ -150,6 +151,11 @@ class DialogueExplorer
 				else
 					@nowLine=@nowOptions[optionnum]
 					@nowOptions=[]
+					if @currentJob=="next"
+						nextlines
+					elsif @currentJob=="prev"
+						prevlines
+					end						
 					choiceprocess
 				end
 			end
