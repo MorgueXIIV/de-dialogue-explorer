@@ -140,7 +140,7 @@ class DialogueExplorer
 		# @searchOptions.flatten!
 		countOpts=@searchOptions.length
 		if countOpts>0 then
-			optStrs=Array.new(10) { |i| @searchOptions[i].to_s }
+			optStrs=Array.new(countOpts) { |i| @searchOptions[i].to_s }
 		end
 		return optStrs
 	end
@@ -262,8 +262,9 @@ class DialogueExplorer
 		#  remove " and 's with GSUB"
 		searchQ.gsub!("'", "_")
 		searchQ.gsub!('"', "_")
+		maxsearch=10000
 		#us SQL query to get the line IDs when they partial match the provided input string.
-		searchDias=$db.execute "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%' limit 100";
+		searchDias=$db.execute "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%' limit #{maxsearch}";
 		#iterates over array of results, getting objects based on their id
 		@searchOptions=[]
 		searchDias.each do |dia|
@@ -600,15 +601,36 @@ class GUIllaume
 				@chbuttoncommands=[]
 			end
 
-			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);
-		traceLine} }
+			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);traceLine} }
 			optionsStrs.each_with_index do |par, i|
 				@childrenButtons.push(TkButton.new(@underButtonFrame, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
 				row=4+(i.div(4))
 				col=(i%4)
 
 				@childrenButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
+
+
+
+			@explorer.traceBackOrForth(true)
+			optionsStrs=@explorer.getBackwardOptStrs
+
+			if not(@parentButtons.nil? or @parentButtons.empty?) then
+				@parentButtons.each do |butter|
+					butter.destroy()
+				end
+			end			
+			@parentButtons=[]
+			@pabuttoncommands=[]
+
+			@pabuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectBackTraceOpt(i);traceLine} }
+			optionsStrs.each_with_index do |par, i|
+				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>100))
+				row=i.div(4)
+				col=(i%4)
+
+				@parentButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
+		end
 
 			parents=[]
 
