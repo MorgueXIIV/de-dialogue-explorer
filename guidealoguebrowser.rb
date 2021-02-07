@@ -438,25 +438,29 @@ class GUIllaume
 		@note.add @page1, :text => 'Search'
 		@note.add @page2, :text => 'Browse'
 		@note.add f3, :text => 'To be determined', :state =>'disabled'
-		@note.grid(:sticky => 'news')
+		@note.grid(:row=>0,:column=>0,:sticky => 'news')
 
 		@searchEntry = TkFrame.new(@page1).grid(:sticky => 'new')
 
 		ph = { 'padx' => 10, 'pady' => 10 } 
 
 		sear= proc {makeSearchResults}
-		TkGrid.columnconfigure @root, 0, :weight => 1; TkGrid.rowconfigure @root, 0, :weight => 1
+		TkGrid.columnconfigure @root, 0, :weight => 1
+		TkGrid.rowconfigure @root, 0, :weight => 1
 
 		@searchStr = TkVariable.new;
 		@searchStr.value="tiptop"
 		TkLabel.new(@searchEntry) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'e')
-		TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wes' )
+		TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wnes' )
 		TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
 
 		@selectedLine = TkVariable.new
 		@resultsCount = TkVariable.new
 		@selectedLine.value="Select a Line To View More Details Here"
-		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>400, "height"=>5).grid( :column => 1, :columnspan=>3, :row => 4, :sticky=>"nsw");
+		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>400, "height"=>5).grid( :column => 1, :columnspan=>3, :row => 4, :sticky=>"nsew");
+
+		TkGrid.columnconfigure @searchEntry, 1,:weight => 1
+		TkGrid.rowconfigure @searchEntry, 4, :weight => 1
 
 		begintrace=proc{traceLine}
 		@traceButton = TkButton.new(@searchEntry, "text"=> 'trace   line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>50).grid( :column => 4, :row => 4, :sticky => 'w')
@@ -465,7 +469,12 @@ class GUIllaume
 		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
 		TkLabel.new(@searchEntry) {text 'Dialogue Lines'}.grid( :column => 3, :row => 3, :sticky => 'w')
 
-		@resultsBox = TkFrame.new(@page1).grid(:sticky => 'sew')
+		@resultsBox = TkFrame.new(@page1).grid(:column=>0,:row=>5,:sticky => 'sewn')
+		TkGrid.columnconfigure @page1, 0, :weight => 1
+		TkGrid.rowconfigure @page1, 5, :weight => 2
+
+		TkGrid.columnconfigure @resultsBox, 1, :weight => 1
+		TkGrid.rowconfigure @resultsBox, 1, :weight => 1
 
 		sel= proc{lineSelect}
 		@searchlistbox = TkListbox.new(@resultsBox) do
@@ -479,15 +488,14 @@ class GUIllaume
 		end
 
 		# @searchlistbox.place('height' => 200,'width'  => 300, 'x'=> 10,'y'=> 10)
-		@searchlistbox.grid(:column=>1, :row => 1, :sticky => "sewn", :columnspan => 3)
+		@searchlistbox.grid(:column=>1, :row => 1, :sticky => "sewn")
 
 		@searchlistbox.bind('ButtonRelease-1', sel)
 
 		scroll = TkScrollbar.new(@resultsBox) do
 		   orient 'vertical'
-		   # place('height' => 200, 'x' => 310, 'y'=>10)
 		end
-		scroll.grid(:column=>5, :row => 1, :sticky => "news")
+		scroll.grid(:column=>2, :row => 1, :sticky => "ns")
 
 		@searchlistbox.yscrollcommand(proc { |*args|
 		   scroll.set(*args)
@@ -497,13 +505,41 @@ class GUIllaume
 		   @searchlistbox.yview(*args)
 		}) 
 
+		scrollx = TkScrollbar.new(@resultsBox) do
+		   orient 'horizontal'
+		end
+		scrollx.grid(:column=>1, :row => 2, :sticky => "ew")
+
+		@searchlistbox.xscrollcommand(proc { |*args|
+		   scrollx.set(*args)
+		})
+
+		scrollx.command(proc { |*args|
+		   @searchlistbox.xview(*args)
+		}) 
+
 		# PAGE 2:
 
-		@convoArea = TkText.new(@page2) {width 40; height 5; wrap "word"}
-		@convoArea.grid( :column => 0, :columnspan=>5, :row => 3, :sticky => 'nwes')
+		@convoDisplayArea = TkFrame.new(@page2)
+		@convoDisplayArea.grid(:column=>3, :row=>3, :sticky=>"sewn" )
 
-		ys = TkScrollbar.new(@page2) {orient 'vertical'}
-		ys.grid( :column => 5, :row => 3, :sticky => 'ns')
+		@underButtonFrame = TkFrame.new(@page2)
+		@underButtonFrame.grid(:column=>3,:row=>5, :sticky=>"sewn" )
+
+		@overButtonFrame = TkFrame.new(@page2)
+		@overButtonFrame.grid(:column=>3,:row=>1, :sticky=>"sewn" )
+
+
+		TkGrid.columnconfigure @page2, 3, :weight => 1
+		TkGrid.rowconfigure @page2, 3, :weight => 1
+
+		@convoArea = TkText.new(@convoDisplayArea) {width 40; height 10; wrap "word"}
+		@convoArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
+		TkGrid.columnconfigure(@convoDisplayArea, 0, :weight => 1)
+		TkGrid.rowconfigure @convoDisplayArea, 0, :weight => 1
+
+		ys = TkScrollbar.new(@convoDisplayArea) {orient 'vertical'}
+		ys.grid( :column => 1, :row => 0, :sticky => 'ns')
 
 		@convoArea['yscrollcommand'] = proc{|*args| ys.set(*args);}
 		ys.command proc{|*args| @convoArea.yview(*args);}
@@ -511,15 +547,15 @@ class GUIllaume
 
 		@convoArea['state']=:disabled
 
-		# xs = Tk::Tile::Scrollbar.new(@page2) {orient 'horizontal'; command proc{|*args| @convoArea.xview(*args);}}
+		# xs = Tk::Tile::Scrollbar.new(@convoDisplayArea) {orient 'horizontal'; command proc{|*args| @convoArea.xview(*args);}}
 		# @convoArea['xscrollcommand'] = proc{|*args| xs.set(*args);}
 		# xs.grid( :column => 0, :row => 1, :sticky => 'we')
 
-		TkGrid.columnconfigure(@page2, 2, :weight => 1)
+		# TkGrid.columnconfigure(@convoDisplayArea, 2, :weight => 1)
 		TkGrid.rowconfigure(@page2, 3, :weight => 1)
 
 
-		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 1, :columnspan => 5, :row => 0, :sticky => 'w')
+		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 3,  :row => 0, :sticky => 'w')
 		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
 	end
 
@@ -549,10 +585,10 @@ class GUIllaume
 
 	def traceLine()
 		@note.select(1)
+		numberofbuttonstostack=4
 		if @explorer.collectionStarted
 			@explorer.traceBackOrForth(false)
 			optionsStrs=@explorer.getForwardOptStrs
-			puts optionsStrs.length
 
 			if @childrenButtons.nil? or @childrenButtons.empty? then
 				@childrenButtons=[]
@@ -567,9 +603,9 @@ class GUIllaume
 			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);
 		traceLine} }
 			optionsStrs.each_with_index do |par, i|
-				@childrenButtons.push(TkButton.new(@page2, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
-				row=4+(i.div(5))
-				col=(i%5)
+				@childrenButtons.push(TkButton.new(@underButtonFrame, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
+				row=4+(i.div(4))
+				col=(i%4)
 
 				@childrenButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
