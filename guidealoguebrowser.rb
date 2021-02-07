@@ -39,7 +39,7 @@ class DialogueEntry
     end
 
     def getParents()
-    	if @parents.nil? or @parents.empty? then
+    	if @parents.nil? then
 	    	idsArray=$db.execute"SELECT originconversationid, origindialogueid FROM dlinks WHERE destinationconversationid='#{@conversationid}' AND destinationdialogueid='#{@id}'";
 	    	parentsList=[]
 	    	idsArray.each do |idPair|
@@ -51,7 +51,7 @@ class DialogueEntry
     end
 
     def getChildren()
-    	if @children.nil? or @children.empty?
+    	if @children.nil? then
 	    	idsArray=$db.execute"SELECT destinationconversationid, destinationdialogueid FROM dlinks WHERE originconversationid='#{@conversationid}' AND origindialogueid='#{@id}'";
 			childsList=[]
 			idsArray.each do |idPair|
@@ -287,7 +287,6 @@ class DialogueExplorer
 		return selOpt.to_s(true)
 	end
 
-	# TODO implement If Needed
 	def selectForwTraceOpt(optToSelect)
 		selOpt=@forwOptions[optToSelect]
 		if selOpt.nil?
@@ -299,14 +298,42 @@ class DialogueExplorer
 	end
 
 	def selectBackTraceOpt(optToSelect)
-		selOpt=@BackOptions[optToSelect]
+		selOpt=@backOptions[optToSelect]
 		if selOpt.nil?
 			return false
 		else
-			@lineCollection.push(selOpt)
+			@lineCollection.unshift(selOpt)
 			return @lineCollection.last.to_s(true)
 		end
 	end
+
+	def removeLine(backw=false)
+		ret=[]
+		if backw then
+			loop do
+				if @lineCollection.length>1 then
+					ret.push(@lineCollection.shift)
+				else
+					break
+				end
+				# this is tricky, it's more efficient in tersm of DB queries to see that the first line only had one parent (already queried while the list was made originally, rather than check the children of the popped line... which I think would add another db execution.
+				break if @lineCollection.first.getParents.length>1
+			end
+		else
+			loop do
+				if @lineCollection.length>1 then
+					ret.unshift(@lineCollection.pop)
+				else
+					break
+				end
+				break if @lineCollection.last.getChildren.length>1
+			end
+		end
+
+		traceBackOrForth(backw)
+		return ret
+	end
+
 
 	def traceBackOrForth(backw=false)
 		if collectionStarted then
@@ -338,93 +365,38 @@ class DialogueExplorer
 	end
 
 	def traceBackAndForth()
-		if @lineCollection.empty? or @lineCollection.nil? then
-			raise "No Starting Point In Line Collection."
-		else
-			if backw then
-				lineToWorkOn = @lineCollection.first
-				# @lineCollection.unshift(lineToAdd)
-				nowOptions=lineToAdd.getParents()
-			else
-				lineToWorkOn = @lineCollection.last
-				# @lineCollection.push(lineToAdd)
-				nowOptions=lineToAdd.getChildren()
-			end
+		traceBackOrForth(true)
+		traceBackOrForth(false)
 
-			if backw then
-			else
-			end
-		end
-
-		if nowOptions.length==1
-			if backw then
-				@lineCollection.unshift(nowOptions[0])
-			else				
-				@lineCollection.push(nowOptions[0])
-			end
-			traceBackOrForth(backw)
-		elsif backw
-			@backOptions=nowOptions
-		else 
-			@forwOptions=nowOptions
-		end
+	# 	if @lineCollection.empty? or @lineCollection.nil? then
+	# 		raise "No Starting Point In Line Collection."
+	# 	else
+	# 		lineToWorkOn = @lineCollection.first
+	# 		# @lineCollection.unshift(lineToAdd)
+	# 		nowOptions=lineToAdd.getParents()
+	# 		if nowOptions.length==1	then
+	# 			@lineCollection.unshift(nowOptions[0])
+	# 			traceBackOrForth(true)
+	# 		else
+	# 			@backOptions=nowOptions
+	# 		end
+	# 		lineToWorkOn = @lineCollection.last
+	# 		# @lineCollection.push(lineToAdd)
+	# 		nowOptions=lineToAdd.getChildren()
+	# 		if nowOptions.length==1
+	# 			@lineCollection.push(nowOptions[0])
+	# 			traceBackOrForth(false)
+	# 		else
+	# 			@forwOptions=nowOptions
+	# 		end
+	# 	end
 	end
-
-	def nextlines()
-		@currentJob="next"
-		if lineSelected? then
-			@lineCollection.push(@nowLine)
-			puts @nowLine.to_s
-			@nowOptions=@nowLine.getChildren()
-			@nowLine=nil
-		elsif not @lineCollection[-1].nil? 
-			@nowOptions=@lineCollection[-1].getChildren()
-		end
-
-		if optionsAvail?
-			if @nowOptions.length==1
-				@nowLine = @nowOptions[0]
-				nextlines()
-			else
-				puts "choose a line (type number) ".light_red
-			end
-		end
-	end
-
-
-	def prevlines()
-		@currentJob="prev"
-
-		if lineSelected? then
-			@lineCollection.unshift(@nowLine)
-			puts @nowLine.to_s
-			@nowOptions=@nowLine.getParents()
-			@nowLine=nil
-		elsif not @lineCollection[0].nil? 
-			@nowOptions=@lineCollection[0].getParents()
-		end
-
-		if optionsAvail?
-			if @nowOptions.length==1
-				@nowLine = @nowOptions[0]
-				prevlines()
-			else
-				puts "choose a line (type number) ".light_red
-			end
-		end
-	end
-
 end
 
 
 class GUIllaume
 	def initialize()
 		@root = TkRoot.new { title "FAYDE Playback Experiment" }
-		# @notepan = TkNotebook.new(@root)
-		# @p1 = TkFrame.new(@notepan); # first page, which would get widgets gridded into it
-		# @p2 = TkFrame.new(@notepan); # second page
-		# @notepan.add(p1, :text => 'One')
-		# # @notepan.add(p2, :text => 'Two')
 		# @root['minsize'] = 50, 50
 		# @root['maxsize'] = 70, 70
 
@@ -586,34 +558,33 @@ class GUIllaume
 		# convo.each do |line|
 		# 	@convoArea.insert("end", line)
 		# end
-
-		@convoArea['state'] = :disabled
 	end
 
 	def traceLine()
 		@note.select(1)
-		numberofbuttonstostack=4
+		numberofbuttonstostack=5
 		if @explorer.collectionStarted
 			@explorer.traceBackOrForth(false)
 			optionsStrs=@explorer.getForwardOptStrs
 
-			if @childrenButtons.nil? or @childrenButtons.empty? then
-				@childrenButtons=[]
+			if @childButtons.nil? or @childButtons.empty? then
+				@childButtons=[]
 			else
-				@childrenButtons.each do |butter|
+				@childButtons.each do |butter|
 					butter.destroy()
 				end
-				@childrenButtons=[]
+				@childButtons=[]
 				@chbuttoncommands=[]
 			end
 
 			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);traceLine} }
 			optionsStrs.each_with_index do |par, i|
-				@childrenButtons.push(TkButton.new(@underButtonFrame, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
-				row=4+(i.div(4))
-				col=(i%4)
+				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
+				row=(i.div(numberofbuttonstostack))
+				col=(i%numberofbuttonstostack)
 
-				@childrenButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
+				@childButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
+			end
 
 
 
@@ -624,30 +595,33 @@ class GUIllaume
 				@parentButtons.each do |butter|
 					butter.destroy()
 				end
-			end			
+			end		
+
 			@parentButtons=[]
 			@pabuttoncommands=[]
 
 			@pabuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectBackTraceOpt(i);traceLine} }
 			optionsStrs.each_with_index do |par, i|
 				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>100))
-				row=i.div(4)
-				col=(i%4)
+				row=i.div(numberofbuttonstostack)
+				col=(i%numberofbuttonstostack)
 
 				@parentButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
-		end
 
-			parents=[]
+				# ADD BACK BUTTONS
+				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(true);traceLine}, "wraplength"=>100))
+				i=@parentButtons.length
+				row=i.div(numberofbuttonstostack)+1
 
+				@parentButtons.last.grid(:row =>row, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
 
-			parentsstring=""
-			parents.each do |par|
-				parentsstring+=par.to_s(true)+"\n"
-			end
+				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(false);traceLine}, "wraplength"=>100))
+				i=@childButtons.length
+				row=i.div(numberofbuttonstostack)+1
 
+				@childButtons.last.grid(:row =>row, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
 			updateConversation
-
 
 		end
 	end
