@@ -115,7 +115,7 @@ class DialogueExplorer
 		end
 	end
 
-	def outputLineCollection()
+	def outputLineCollectionStr()
 		lineCollStr = ""
 		@lineCollection.each do |line|
 			lineCollStr+= line.to_s + "\n"
@@ -123,14 +123,24 @@ class DialogueExplorer
 		return lineCollStr
 	end
 
+
+	def outputLineCollectionArr()
+		lineCollArr=[]
+		@lineCollection.each do |line|
+			lineCollArr.push(line)
+		end
+		return lineCollArr
+	end
+
 	def getCurrentLineStr(lomg=false)
 		return @nowLine.to_s(lomg)
 	end
 
 	def getSearchOptStrs(lomg=false)
+		# @searchOptions.flatten!
 		countOpts=@searchOptions.length
 		if countOpts>0 then
-			optStrs=Array.new(10) { |i| @searchOptions[i].to_s(lomg) }
+			optStrs=Array.new(10) { |i| @searchOptions[i].to_s }
 		end
 		return optStrs
 	end
@@ -280,6 +290,7 @@ class DialogueExplorer
 		if selOpt.nil?
 			return false
 		else
+			@lineCollection.push(selOpt)
 			return @lineCollection.last.to_s(true)
 		end
 	end
@@ -289,8 +300,8 @@ class DialogueExplorer
 		if selOpt.nil?
 			return false
 		else
-			traceBackOrForth(true,selOpt)
-			return true
+			@lineCollection.push(selOpt)
+			return @lineCollection.last.to_s(true)
 		end
 	end
 
@@ -304,10 +315,6 @@ class DialogueExplorer
 				lineToWorkOn = @lineCollection.last
 				# @lineCollection.push(lineToAdd)
 				nowOptions=lineToWorkOn.getChildren()
-			end
-
-			if backw then
-			else
 			end
 		else
 			raise "No Starting Point In Line Collection."
@@ -474,13 +481,13 @@ class GUIllaume
 		# @searchlistbox.place('height' => 200,'width'  => 300, 'x'=> 10,'y'=> 10)
 		@searchlistbox.grid(:column=>1, :row => 1, :sticky => "sewn", :columnspan => 3)
 
+		@searchlistbox.bind('ButtonRelease-1', sel)
+
 		scroll = TkScrollbar.new(@resultsBox) do
 		   orient 'vertical'
 		   # place('height' => 200, 'x' => 310, 'y'=>10)
 		end
 		scroll.grid(:column=>5, :row => 1, :sticky => "news")
-
-		@searchlistbox.bind('ButtonRelease-1', sel)
 
 		@searchlistbox.yscrollcommand(proc { |*args|
 		   scroll.set(*args)
@@ -492,14 +499,27 @@ class GUIllaume
 
 		# PAGE 2:
 
-		@childsstring=TkVariable.new
-		@parentsstring=TkVariable.new
-		# @pickmeline=TkVariable.new
-		@conversationSoFar=TkVariable.new
+		@convoArea = TkText.new(@page2) {width 40; height 5; wrap "word"}
+		@convoArea.grid( :column => 0, :columnspan=>5, :row => 3, :sticky => 'nwes')
 
-		TkLabel.new(@page2, "textvariable" => @parentsstring, "wraplength"=>400).grid( :column => 1, :row => 1, :sticky => 'nw')
-		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 1, :row => 3, :sticky => 'w')
-		TkLabel.new(@page2, "textvariable" => @childsstring, "wraplength"=>400).grid( :column => 1, :row => 5, :sticky => 'sw')
+		ys = TkScrollbar.new(@page2) {orient 'vertical'}
+		ys.grid( :column => 5, :row => 3, :sticky => 'ns')
+
+		@convoArea['yscrollcommand'] = proc{|*args| ys.set(*args);}
+		ys.command proc{|*args| @convoArea.yview(*args);}
+		@convoArea.insert('end', "Conversation Will Display Here When Tracing Begins ")
+
+		@convoArea['state']=:disabled
+
+		# xs = Tk::Tile::Scrollbar.new(@page2) {orient 'horizontal'; command proc{|*args| @convoArea.xview(*args);}}
+		# @convoArea['xscrollcommand'] = proc{|*args| xs.set(*args);}
+		# xs.grid( :column => 0, :row => 1, :sticky => 'we')
+
+		TkGrid.columnconfigure(@page2, 2, :weight => 1)
+		TkGrid.rowconfigure(@page2, 3, :weight => 1)
+
+
+		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 1, :columnspan => 5, :row => 0, :sticky => 'w')
 		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
 	end
 
@@ -513,38 +533,56 @@ class GUIllaume
 		end
 	end
 
+	def updateConversation()
+		@convoArea['state'] = :normal
+		convo=@explorer.outputLineCollectionStr
+
+		@convoArea.delete(1.0, 'end')
+		@convoArea.insert(1.0, convo)
+
+		# convo.each do |line|
+		# 	@convoArea.insert("end", line)
+		# end
+
+		@convoArea['state'] = :disabled
+	end
+
 	def traceLine()
 		@note.select(1)
 		if @explorer.collectionStarted
-			# setchild=proc{@childsstring.value=@nowLine.getChildren[0].to_s}
 			@explorer.traceBackOrForth(false)
-			children=@explorer.getForwardOptStrs
-			puts children.length
+			optionsStrs=@explorer.getForwardOptStrs
+			puts optionsStrs.length
 
 			if @childrenButtons.nil? or @childrenButtons.empty? then
 				@childrenButtons=[]
 			else
-				@childrenButtons.each do |butter| 
+				@childrenButtons.each do |butter|
 					butter.destroy()
 				end
 				@childrenButtons=[]
 				@chbuttoncommands=[]
 			end
 
-			@chbuttoncommands=Array.new(children.length) { |i| proc{@childsstring.value=@explorer.selectForwTraceOpt(i);traceLine} }
-			children.each_with_index do |par, i|
+			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);
+		traceLine} }
+			optionsStrs.each_with_index do |par, i|
 				@childrenButtons.push(TkButton.new(@page2, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
-				@childrenButtons[i].grid(:row =>4, :column => i, :sticky => 'ns')
+				row=4+(i.div(5))
+				col=(i%5)
+
+				@childrenButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
 
 			parents=[]
+
+
 			parentsstring=""
 			parents.each do |par|
 				parentsstring+=par.to_s(true)+"\n"
 			end
 
-			@parentsstring.value=parentsstring
-			@childsstring.value=""
+			updateConversation
 
 
 		end
