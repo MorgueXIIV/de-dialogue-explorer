@@ -141,6 +141,8 @@ class DialogueExplorer
 		countOpts=@searchOptions.length
 		if countOpts>0 then
 			optStrs=Array.new(countOpts) { |i| @searchOptions[i].to_s }
+		else
+			optStrs=[]
 		end
 		return optStrs
 	end
@@ -445,14 +447,16 @@ class GUIllaume
 
 		ph = { 'padx' => 10, 'pady' => 10 } 
 
-		sear= proc {makeSearchResults}
+
 		TkGrid.columnconfigure @root, 0, :weight => 1
 		TkGrid.rowconfigure @root, 0, :weight => 1
 
 		@searchStr = TkVariable.new;
 		@searchStr.value="tiptop"
 		TkLabel.new(@searchEntry) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'e')
-		TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wnes' )
+		searchtextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wnes' )
+		sear= proc {makeSearchResults}
+		searchtextbox.bind('Return', proc {makeSearchResults})
 		TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
 
 		@selectedLine = TkVariable.new
@@ -492,6 +496,8 @@ class GUIllaume
 		@searchlistbox.grid(:column=>1, :row => 1, :sticky => "sewn")
 
 		@searchlistbox.bind('ButtonRelease-1', sel)
+		@searchlistbox.bind('Return', sel)
+
 
 		scroll = TkScrollbar.new(@resultsBox) do
 		   orient 'vertical'
