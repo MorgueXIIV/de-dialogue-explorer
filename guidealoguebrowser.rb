@@ -7,8 +7,8 @@ require "colorize"
 
 class DialogueEntry
 	def initialize(convoID,lineID)
-		dialogueArray=$db.execute "SELECT id, title, dialoguetext, actor, conversant, conversationid,isgroup, hascheck,sequence, hasalts,conditionstring, userscript FROM dentries WHERE conversationid='#{convoID}' AND id='#{lineID}'";
-		dialogueArray=dialogueArray.first
+		dialogueArray=$db.execute "SELECT id, title, dialoguetext, actor, conversant, conversationid,isgroup, hascheck,sequence, hasalts,conditionstring, userscript, difficultypass FROM dentries WHERE conversationid='#{convoID}' AND id='#{lineID}'";
+		dialogueArray.flatten!
 		@id=dialogueArray[0]
 		@title=dialogueArray[1]
 		@dialoguetext=dialogueArray[2]
@@ -35,6 +35,7 @@ class DialogueEntry
 		@hasalts=dialogueArray[9]
 		@conditionstring=dialogueArray[10]
 		@userscript=dialogueArray[11]
+		@difficultypass=dialogueArray[12]
 
     end
 
@@ -63,20 +64,42 @@ class DialogueEntry
 	end
 
 
-	def to_s(lomg=false)
-		if @dialoguetext=="0" then
-			stringV = "#{@actor}: #{@title}"
-			#.colorize(:cyan)
+	def to_s(lomg=false, markdown=false)
+		if markdown then
+			ital = "*"
+			bold = "**"
 		else
-			stringV = "#{@actor}: #{@dialoguetext}"
-			# .light_blue.bold+
+			ital=""
+			bold=""
 		end
 
-		if lomg
-			stringV.concat("\n/#{@condition}/#{@userscript}/#{@sequence}")
+		lomginfo=extraInfo()
+		if @dialoguetext=="0" then
+			if lomginfo.length<2 or lomginfo=="Continue()"
+				lomginfo+=@title
+			end
+			stringV = "\t#{ital}HUB: #{lomginfo}#{ital}"
+			#.colorize(:cyan)
+		else
+			stringV = "#{bold}#{@actor}:#{bold} #{@dialoguetext}"
+			# ".light_blue.bold+"
+			if lomg and lomginfo.length > 1
+				stringV.concat("\n\t#{ital}#{lomginfo}#{ital}")
+			end
 		end
 
 		return stringV
+	end
+
+	def extraInfo()
+		lomgpossinfo=[@conditionstring,@userscript,@sequence]
+		lomgpossinfo.reject!{|info| info.nil? or info.length<2 }
+		if @difficultypass>0 then
+			lomgpossinfo.push("show only if #{@actor} better than #{@difficultypass}")
+		end
+
+		lomginfo=lomgpossinfo.join(": ")
+		return lomginfo
 	end
 
 	def myStory(lomg=true)
@@ -115,11 +138,15 @@ class DialogueExplorer
 		end
 	end
 
-	def outputLineCollectionStr()
-		lineCollStr = ""
-		@lineCollection.each do |line|
-			lineCollStr+= line.to_s + "\n"
-		end
+	def outputLineCollectionStr(lomg=false, removehubs=false, markdown=false)
+		lineCollStr = @lineCollection.map { |e| e.to_s(lomg, markdown) }
+			if removehubs then
+				lineCollStr.select! {|e| (e["HUB"]).nil?}
+			end
+		lineCollStr = lineCollStr.join("\n")
+		# @lineCollection.each do |line|
+		# 	lineCollStr.concat(line.to_s(lomg) + "\n")
+		# end
 		return lineCollStr
 	end
 
@@ -225,20 +252,27 @@ class DialogueExplorer
 
 	# TODO refactor to RETURN not print the dump
 	def dialoguedump()
-		if @nowLine.nil?
-			puts "What conversation is this?"
-			convoID=gets.chomp.to_i
-		else
+		if lineSelected?
 			convoID=@nowLine.getConvoID
+		elsif collectionStarted
+			convoID=@lineCollection[0].getConvoID
+		else
+			return false			
 		end 
-		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conversationid, dentries.id, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
+		dumpStr=""
+		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
 		searchDias.each do |lineArray|
 			if lineArray[1]=="0" && lineArray.length>4 then
-				puts "#{lineArray[0]}: #{lineArray[4]}".colorize(:cyan)
+				dumpStr.concat("#{lineArray[0]}: #{lineArray[4]}\n")
 			else
-				puts "#{lineArray[0]}:".light_blue.bold+" #{lineArray[1]}"
+				dumpStr.concat("#{lineArray[0]}: #{lineArray[1]}\n")
+			end
+			bonusinfo=lineArray[2]+" : " +lineArray[3]
+			if bonusinfo.length>5
+				dumpStr.concat("\t #{bonusinfo} \n")
 			end
 		end
+		return dumpStr
 	end 
 
 	# refactor to RETURN not output
@@ -409,10 +443,10 @@ class GUIllaume
 		end		
 		@page1 = TkFrame.new(@note)
 		@page2 = TkFrame.new(@note)
-		f3 = TkFrame.new(@note)		
+		@page3 = TkFrame.new(@note)		
 		@note.add @page1, :text => 'Search'
-		@note.add @page2, :text => 'Browse'
-		@note.add f3, :text => 'To be determined', :state =>'disabled'
+		@note.add @page2, :text => 'Browse', :state=>"normal"
+		@note.add @page3, :text => 'Dialogue Dump', :state =>'normal'
 		@note.grid(:row=>0,:column=>0,:sticky => 'news')
 
 		@searchEntry = TkFrame.new(@page1).grid(:sticky => 'new')
@@ -425,11 +459,21 @@ class GUIllaume
 
 		@searchStr = TkVariable.new;
 		@searchStr.value="tiptop"
-		TkLabel.new(@searchEntry) {text 'search for;'}.grid( :column => 1, :row => 1, :sticky => 'e')
+		TkLabel.new(@searchEntry) {text 'search for:'}.grid( :column => 1, :row => 1, :sticky => 'w')
 		searchtextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wnes' )
 		sear= proc {makeSearchResults}
 		searchtextbox.bind('Return', proc {makeSearchResults})
 		TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
+
+		@actorStr = TkVariable.new;
+		@actorStr.value="kim"
+		TkLabel.new(@searchEntry) {text 'only said by:'}.grid( :column => 4, :row => 1, :sticky => 'w')
+		searchnametextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @actorStr)
+		searchnametextbox.grid( :column =>4, :columnspan=>2, :row => 2, :sticky => 'we' )
+		actorfind= proc{getNames}
+		searchtextbox.bind('Return', actorfind)
+		# TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
+
 
 		@selectedLine = TkVariable.new
 		@resultsCount = TkVariable.new
@@ -440,7 +484,9 @@ class GUIllaume
 		TkGrid.rowconfigure @searchEntry, 4, :weight => 1
 
 		begintrace=proc{traceLine}
-		@traceButton = TkButton.new(@searchEntry, "text"=> 'trace   line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>50).grid( :column => 4, :row => 4, :sticky => 'w')
+		@traceButton = TkButton.new(@searchEntry, "text"=> 'trace   line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>50).grid( :column => 4, :row => 4, :sticky => 'we')
+		begindump=proc{dumpLine}
+		@dumpButton = TkButton.new(@searchEntry, "text"=> 'dump   convo ', "command"=> begindump, "state"=>"disabled", "wraplength"=>50).grid( :column => 5, :row => 4, :sticky => 'we')
 
 		TkLabel.new(@searchEntry) {text 'we found;'}.grid( :column => 1, :row => 3, :sticky => 'e')
 		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
@@ -509,8 +555,48 @@ class GUIllaume
 		@overButtonFrame.grid(:column=>3,:row=>1, :sticky=>"sewn" )
 
 
+		@browseDisplayOptions = TkFrame.new(@page2)
+		@browseDisplayOptions.grid(:column=>3, :row=>0, :sticky=>"sewn" )
+
+
 		TkGrid.columnconfigure @page2, 3, :weight => 1
 		TkGrid.rowconfigure @page2, 3, :weight => 1
+
+		upda=proc{updateConversation}
+
+		TkLabel.new(@browseDisplayOptions, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 3,  :row => 1, :rowspan=>3, :sticky => 'w')
+		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
+		@browserMarkdown = TkVariable.new
+		@browserMarkdown.value = false 
+		browsemarkcheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'add markdown?',
+	    	"command" =>upda,
+	    	"variable" =>@browserMarkdown,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsemarkcheckbox.grid(:row=>1, :column=>5)
+
+		@browserHubs = TkVariable.new
+		@browserHubs.value = false 
+	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'show hubs?',
+	    	"command" =>upda,
+	    	"variable" =>@browserHubs,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsehubscheckbox.grid(:row=>2, :column=>5)
+
+	    @browserShowMore = TkVariable.new
+		@browserShowMore.value = true
+	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'show details?',
+	    	"command" =>upda,
+	    	"variable" =>@browserShowMore,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsehubscheckbox.grid(:row=>3, :column=>5)
+
+
 
 		@convoArea = TkText.new(@convoDisplayArea) {width 40; height 10; wrap "word"}
 		@convoArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
@@ -524,8 +610,6 @@ class GUIllaume
 		ys.command proc{|*args| @convoArea.yview(*args);}
 		@convoArea.insert('end', "Conversation Will Display Here When Tracing Begins ")
 
-		@convoArea['state']=:disabled
-
 		# xs = Tk::Tile::Scrollbar.new(@convoDisplayArea) {orient 'horizontal'; command proc{|*args| @convoArea.xview(*args);}}
 		# @convoArea['xscrollcommand'] = proc{|*args| xs.set(*args);}
 		# xs.grid( :column => 0, :row => 1, :sticky => 'we')
@@ -534,8 +618,26 @@ class GUIllaume
 		TkGrid.rowconfigure(@page2, 3, :weight => 1)
 
 
-		TkLabel.new(@page2, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 3,  :row => 0, :sticky => 'w')
-		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
+
+
+		# PAGE 3:
+
+		@dumpDisplayArea = TkFrame.new(@page3)
+		@dumpDisplayArea.grid(:column=>3, :row=>3, :sticky=>"sewn" )
+		TkGrid.columnconfigure @page3, 3, :weight => 1
+		TkGrid.rowconfigure @page3, 3, :weight => 1
+
+		@dumpTextBox = TkText.new(@dumpDisplayArea) {width 40; height 10; wrap "word"}
+		@dumpTextBox.grid(:column => 0, :row => 0, :sticky => 'nwes')
+		TkGrid.columnconfigure(@dumpDisplayArea, 0, :weight => 1)
+		TkGrid.rowconfigure @dumpDisplayArea, 0, :weight => 1
+
+		yds = TkScrollbar.new(@dumpDisplayArea) {orient 'vertical'}
+		yds.grid( :column => 1, :row => 0, :sticky => 'ns')
+
+		@dumpTextBox['yscrollcommand'] = proc{|*args| yds.set(*args);}
+		yds.command proc{|*args| @dumpTextBox.yview(*args);}
+		@convoArea.insert('end', "Dump Will Display Here ")
 	end
 
 	def lineSelect()
@@ -545,12 +647,18 @@ class GUIllaume
 			selectedStr=@explorer.selectSearchOption(selected)
 			@selectedLine.value="selected: #{selectedStr}"
 			@traceButton.state="active"
+			@dumpButton.state="active"
 		end
+	end
+
+	def getNames()
+		puts "it hapeninin"
+		puts @actorStr.value
 	end
 
 	def updateConversation()
 		@convoArea['state'] = :normal
-		convo=@explorer.outputLineCollectionStr
+		convo=@explorer.outputLineCollectionStr(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
 
 		@convoArea.delete(1.0, 'end')
 		@convoArea.insert(1.0, convo)
@@ -560,7 +668,16 @@ class GUIllaume
 		# end
 	end
 
+	def dumpLine()
+		# @page3["state"]=:normal
+		@note.select(2)
+		@dumpTextBox.delete(1.0, 'end')
+		dump= @explorer.dialoguedump
+		@dumpTextBox.insert(1.0, dump)
+	end
+
 	def traceLine()
+		# @page2["state"]=:normal
 		@note.select(1)
 		numberofbuttonstostack=5
 		if @explorer.collectionStarted
