@@ -76,7 +76,7 @@ class DialogueEntry
 		lomginfo=extraInfo()
 		if @dialoguetext=="0" then
 			if lomginfo.length<2 or lomginfo=="Continue()"
-				lomginfo+=@title
+				lomginfo=@title
 			end
 			stringV = "\t#{ital}HUB: #{lomginfo}#{ital}"
 			#.colorize(:cyan)
@@ -94,8 +94,10 @@ class DialogueEntry
 	def extraInfo()
 		lomgpossinfo=[@conditionstring,@userscript,@sequence]
 		lomgpossinfo.reject!{|info| info.nil? or info.length<2 }
+
 		if @difficultypass>0 then
-			lomgpossinfo.push("show only if #{@actor} better than #{@difficultypass}")
+			hardness=@difficultypass+3
+			lomgpossinfo.unshift("If #{@actor} better than #{hardness}")
 		end
 
 		lomginfo=lomgpossinfo.join(": ")
@@ -289,7 +291,7 @@ class DialogueExplorer
 		end
 	end 
 
-	def searchlines(searchQ=nil)
+	def searchlines(searchQ=nil, actorlimit=false)
 		if searchQ.nil? or searchQ.length<3
 			#receive text input from command line,
 			puts "Enter search query: (over 3 chars)"
@@ -298,9 +300,16 @@ class DialogueExplorer
 		#  remove " and 's with GSUB"
 		searchQ.gsub!("'", "_")
 		searchQ.gsub!('"', "_")
-		maxsearch=10000
+		maxsearch=0
 		#us SQL query to get the line IDs when they partial match the provided input string.
-		searchDias=$db.execute "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%' limit #{maxsearch}";
+		query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+		if actorlimit.to_i>0
+			query+="and actor='#{actorlimit}'"
+		end
+		if maxsearch<0
+			query+="limit #{maxsearch}"
+		end
+		searchDias=$db.execute query
 		#iterates over array of results, getting objects based on their id
 		@searchOptions=[]
 		searchDias.each do |dia|
@@ -430,6 +439,7 @@ end
 
 class GUIllaume
 	def initialize()
+		@actorlimit=0
 		@root = TkRoot.new { title "FAYDE Playback Experiment" }
 		# @root['minsize'] = 50, 50
 		# @root['maxsize'] = 70, 70
@@ -468,11 +478,12 @@ class GUIllaume
 		@actorStr = TkVariable.new;
 		@actorStr.value="kim"
 		TkLabel.new(@searchEntry) {text 'only said by:'}.grid( :column => 4, :row => 1, :sticky => 'w')
-		searchnametextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @actorStr)
-		searchnametextbox.grid( :column =>4, :columnspan=>2, :row => 2, :sticky => 'we' )
+		@searchnametextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @actorStr)
+		@searchnametextbox.grid( :column =>4, :columnspan=>2, :row => 2, :sticky => 'we' )
 		actorfind= proc{getNames}
-		searchtextbox.bind('Return', actorfind)
-		# TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
+		actorlose= proc{ungetNames}
+		@searchnametextbox.bind('Key', actorfind)
+		TkButton.new(@searchEntry, "text"=> 'clear', "command"=> actorlose).grid( :column => 5, :row => 3, :sticky => 'sewn')
 
 
 		@selectedLine = TkVariable.new
@@ -652,9 +663,24 @@ class GUIllaume
 	end
 
 	def getNames()
-		puts "it hapeninin"
-		puts @actorStr.value
+		if @actorStr.value.chomp(' ').length>2
+			puts @actorStr.value
+			actormatches = $db.execute("Select name,id from actors where name like '%#{@actorStr.value}%'")
+			if actormatches.length==1
+				@actorStr.value=actormatches[0][0]
+				@searchnametextbox.state="disabled"
+				@actorlimit=actormatches[0][1]
+			end
+		end
 	end
+
+	def ungetNames()
+		@actorStr.value=""
+		@searchnametextbox.state="normal"
+		@actorlimit=0
+
+	end
+
 
 	def updateConversation()
 		@convoArea['state'] = :normal
@@ -749,7 +775,7 @@ class GUIllaume
 		@searchlistbox.state="normal"
 		searchStr=@searchStr.value
 		searchResults=""
-		@lineSearch=@explorer.searchlines(searchStr)
+		@lineSearch=@explorer.searchlines(searchStr,@actorlimit)
 		@resultsCount.value=@lineSearch.length
 
 		itemsinbox=@searchlistbox.size
