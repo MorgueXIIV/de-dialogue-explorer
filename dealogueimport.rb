@@ -172,7 +172,7 @@ begin
 
 	# these strings represent the various keys we need from each hash to fed into the database
 	# stored in an ITERABLE array so we can easily use them in a method for a nice DRY grab of data to insert
-	listOfLineAtts=["id","Title","Dialogue Text","Sequence","Actor","Conversant","conversationID", "difficultyPass","isGroup","conditionsString","userScript"]
+	listOfLineAtts=["id","Title","Dialogue Text","Sequence","Actor","Conversant","conversationID", "DifficultyPass","isGroup","conditionsString","userScript"]
 	listOfConvoAtts=["id", "Title", "Description","Actor","Conversant"]
 	listOfLinkAtts=["originConversationID","originDialogueID","destinationConversationID","destinationDialogueID","isConnector","priority"]
 
@@ -181,10 +181,11 @@ begin
 	# POPULATING CERTAIN TABLES
 	doActors=false
 	doDialogues=false
-	doDentries=false
+	doDentries=true
 	doDlinks=false
 	doChecks=false
 	doModifiers=false
+	doActorTalkativeness=false
 
 	#inistialise counter
 	numberOfdbEntriesMade=0;
@@ -272,23 +273,25 @@ begin
 
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 
-	#adds a value to talkativeness in actors table with the number of lines they've said 
-	#for every actor in the actors table, counts how many times their id appears in the actor column in the dentries table
+	if doActorTalkativeness then 
+		#adds a value to talkativeness in actors table with the number of lines they've said 
+		#for every actor in the actors table, counts how many times their id appears in the actor column in the dentries table
 
-	talkyArray=[]
-	
-	for currentActor in Array(0..408)
-		lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
-		lineCount = lineCount[0][0]
-		talkyArray[currentActor] = lineCount
-	end
+		talkyArray=[]
+		
+		for currentActor in Array(0..408)
+			lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
+			lineCount = lineCount[0][0]
+			talkyArray[currentActor] = lineCount
+		end
 
-	db.transaction
-	talkyArray.each_with_index do |value, i|
-		db.execute "UPDATE actors SET talkativeness = #{value} WHERE id = #{i}"
-		numberOfdbEntriesUpdated+=1
+		db.transaction
+		talkyArray.each_with_index do |value, i|
+			db.execute "UPDATE actors SET talkativeness = #{value} WHERE id = #{i}"
+			numberOfdbEntriesUpdated+=1
+		end
+		db.commit
 	end
-	db.commit
 
 	endtime=Time.now()
 	timetaken=endtime - starttime
