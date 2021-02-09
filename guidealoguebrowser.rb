@@ -291,18 +291,34 @@ class DialogueExplorer
 		end
 	end 
 
-	def searchlines(searchQ=nil, actorlimit=false)
-		if searchQ.nil? or searchQ.length<3
-			#receive text input from command line,
-			puts "Enter search query: (over 3 chars)"
-			searchQ=gets.chomp
-		end
+	def searchlines(searchQ=nil, actorlimit=false,byphrase=true, some=false)
+		# if searchQ.nil?
+		# 	#receive text input from command line,
+		# 	puts "Enter search query: (over 3 chars)"
+		# 	searchQ=gets.chomp
+		# end
+
 		#  remove " and 's with GSUB"
 		searchQ.gsub!("'", "_")
 		searchQ.gsub!('"', "_")
 		maxsearch=0
 		#us SQL query to get the line IDs when they partial match the provided input string.
-		query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+		if byphrase then
+			query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+		else
+			searchwords=searchQ.split(" ")
+			if searchwords.length>0 and searchwords.length<20 then
+				searchwords.reject!{|e| e<3}
+				query="SELECT conversationid,id FROM dentries WHERE "
+				searchwords.map! { |e| "(dentries.dialoguetext LIKE'%#{e}%')"}
+				boolop = some ? " or " : " and "
+				query.concat(searchwords.join(boolop))
+			else
+				query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+			end
+		end
+		puts query
+
 		if actorlimit.to_i>0
 			query+="and actor='#{actorlimit}'"
 		end
@@ -481,9 +497,13 @@ class GUIllaume
 		@searchnametextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @actorStr)
 		@searchnametextbox.grid( :column =>4, :columnspan=>2, :row => 2, :sticky => 'we' )
 		actorfind= proc{getNames}
+		actorfinde= proc{getNames(true)}
 		actorlose= proc{ungetNames}
 		@searchnametextbox.bind('Key', actorfind)
+		@searchnametextbox.bind('Return', actorfinde)
 		TkButton.new(@searchEntry, "text"=> 'clear', "command"=> actorlose).grid( :column => 5, :row => 3, :sticky => 'sewn')
+
+		# gt h./////////////////p-0 
 
 
 		@selectedLine = TkVariable.new
@@ -662,14 +682,22 @@ class GUIllaume
 		end
 	end
 
-	def getNames()
+	def getNames(complete=false)
 		if @actorStr.value.chomp(' ').length>2
-			puts @actorStr.value
 			actormatches = $db.execute("Select name,id from actors where name like '%#{@actorStr.value}%'")
 			if actormatches.length==1
 				@actorStr.value=actormatches[0][0]
 				@searchnametextbox.state="disabled"
 				@actorlimit=actormatches[0][1]
+			end
+		end
+		if complete
+			actormatches.each do |result|
+				if @actorStr.value.chomp.casecmp(result[0])==0 then
+					@actorStr.value=result[0]
+					@searchnametextbox.state="disabled"
+					@actorlimit=result[1]
+				end
 			end
 		end
 	end
@@ -775,9 +803,10 @@ class GUIllaume
 		@searchlistbox.state="normal"
 		searchStr=@searchStr.value
 		searchResults=""
-		@lineSearch=@explorer.searchlines(searchStr,@actorlimit)
+		@searchByPhrase=false
+		@searchAnyWord=false
+		@lineSearch=@explorer.searchlines(searchStr,@actorlimit,@searchByPhrase, @searchAnyWord)
 		@resultsCount.value=@lineSearch.length
-
 		itemsinbox=@searchlistbox.size
 
 		if itemsinbox>0 then
