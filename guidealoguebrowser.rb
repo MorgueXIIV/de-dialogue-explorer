@@ -96,8 +96,8 @@ class DialogueEntry
 		lomgpossinfo.reject!{|info| info.nil? or info.length<2 }
 
 		if @difficultypass>0 then
-			hardness=@difficultypass+3
-			lomgpossinfo.unshift("If #{@actor} better than #{hardness}")
+			hardness=@difficultypass+0
+			lomgpossinfo.unshift("passive #{@actor} check, (difficulty #{hardness}-ish)")
 		end
 
 		lomginfo=lomgpossinfo.join(": ")
@@ -308,7 +308,7 @@ class DialogueExplorer
 		else
 			searchwords=searchQ.split(" ")
 			if searchwords.length>0 and searchwords.length<20 then
-				searchwords.reject!{|e| e<3}
+				searchwords.reject!{|e| e.length<3}
 				query="SELECT conversationid,id FROM dentries WHERE "
 				searchwords.map! { |e| "(dentries.dialoguetext LIKE'%#{e}%')"}
 				boolop = some ? " or " : " and "
@@ -317,7 +317,6 @@ class DialogueExplorer
 				query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
 			end
 		end
-		puts query
 
 		if actorlimit.to_i>0
 			query+="and actor='#{actorlimit}'"
@@ -426,29 +425,6 @@ class DialogueExplorer
 	def traceBackAndForth()
 		traceBackOrForth(true)
 		traceBackOrForth(false)
-
-	# 	if @lineCollection.empty? or @lineCollection.nil? then
-	# 		raise "No Starting Point In Line Collection."
-	# 	else
-	# 		lineToWorkOn = @lineCollection.first
-	# 		# @lineCollection.unshift(lineToAdd)
-	# 		nowOptions=lineToAdd.getParents()
-	# 		if nowOptions.length==1	then
-	# 			@lineCollection.unshift(nowOptions[0])
-	# 			traceBackOrForth(true)
-	# 		else
-	# 			@backOptions=nowOptions
-	# 		end
-	# 		lineToWorkOn = @lineCollection.last
-	# 		# @lineCollection.push(lineToAdd)
-	# 		nowOptions=lineToAdd.getChildren()
-	# 		if nowOptions.length==1
-	# 			@lineCollection.push(nowOptions[0])
-	# 			traceBackOrForth(false)
-	# 		else
-	# 			@forwOptions=nowOptions
-	# 		end
-	# 	end
 	end
 end
 
@@ -486,13 +462,14 @@ class GUIllaume
 		@searchStr = TkVariable.new;
 		@searchStr.value="tiptop"
 		TkLabel.new(@searchEntry) {text 'search for:'}.grid( :column => 1, :row => 1, :sticky => 'w')
+
 		searchtextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wnes' )
 		sear= proc {makeSearchResults}
 		searchtextbox.bind('Return', proc {makeSearchResults})
 		TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
 
 		@actorStr = TkVariable.new;
-		@actorStr.value="kim"
+		@actorStr.value=""
 		TkLabel.new(@searchEntry) {text 'only said by:'}.grid( :column => 4, :row => 1, :sticky => 'w')
 		@searchnametextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @actorStr)
 		@searchnametextbox.grid( :column =>4, :columnspan=>2, :row => 2, :sticky => 'we' )
@@ -503,13 +480,17 @@ class GUIllaume
 		@searchnametextbox.bind('Return', actorfinde)
 		TkButton.new(@searchEntry, "text"=> 'clear', "command"=> actorlose).grid( :column => 5, :row => 3, :sticky => 'sewn')
 
-		# gt h./////////////////p-0 
+		@searchstyle = TkVariable.new
+		@searchstyle.value="all"
+		TkRadioButton.new(@searchEntry, "text" => 'exact phrase', "variable" => @searchstyle, "value" => 'phrase').grid( :column => 1, :row => 3, :sticky=>"e")
+		TkRadioButton.new(@searchEntry, "text" => 'all words', "variable" => @searchstyle, "value" => 'all').grid( :column => 2, :row => 3, :sticky=>"ew")
+		TkRadioButton.new(@searchEntry, "text" => 'any words', "variable" => @searchstyle, "value" => 'any').grid( :column => 3, :row => 3, :sticky=>"w")
 
 
 		@selectedLine = TkVariable.new
 		@resultsCount = TkVariable.new
 		@selectedLine.value="Select a Line To View More Details Here"
-		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>400, "height"=>5).grid( :column => 1, :columnspan=>3, :row => 4, :sticky=>"nsew");
+		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>600, "height"=>5).grid( :column => 1, :columnspan=>5, :row => 5, :sticky=>"nsew");
 
 		TkGrid.columnconfigure @searchEntry, 1,:weight => 1
 		TkGrid.rowconfigure @searchEntry, 4, :weight => 1
@@ -519,9 +500,9 @@ class GUIllaume
 		begindump=proc{dumpLine}
 		@dumpButton = TkButton.new(@searchEntry, "text"=> 'dump   convo ', "command"=> begindump, "state"=>"disabled", "wraplength"=>50).grid( :column => 5, :row => 4, :sticky => 'we')
 
-		TkLabel.new(@searchEntry) {text 'we found;'}.grid( :column => 1, :row => 3, :sticky => 'e')
-		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 3, :sticky => 'e');
-		TkLabel.new(@searchEntry) {text 'Dialogue Lines'}.grid( :column => 3, :row => 3, :sticky => 'w')
+		TkLabel.new(@searchEntry) {text 'we found;'}.grid( :column => 1, :row => 4, :sticky => 'e')
+		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 4, :sticky => 'e');
+		TkLabel.new(@searchEntry) {text 'Dialogue Lines'}.grid( :column => 3, :row => 4, :sticky => 'w')
 
 		@resultsBox = TkFrame.new(@page1).grid(:column=>0,:row=>5,:sticky => 'sewn')
 		TkGrid.columnconfigure @page1, 0, :weight => 1
@@ -540,8 +521,6 @@ class GUIllaume
 			state "disabled"
 			# pack('fill' => 'x')
 		end
-
-		# @searchlistbox.place('height' => 200,'width'  => 300, 'x'=> 10,'y'=> 10)
 		@searchlistbox.grid(:column=>1, :row => 1, :sticky => "sewn")
 
 		@searchlistbox.bind('ButtonRelease-1', sel)
@@ -598,7 +577,7 @@ class GUIllaume
 		TkLabel.new(@browseDisplayOptions, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 3,  :row => 1, :rowspan=>3, :sticky => 'w')
 		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
 		@browserMarkdown = TkVariable.new
-		@browserMarkdown.value = false 
+		@browserMarkdown.value = true
 		browsemarkcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'add markdown?',
 	    	"command" =>upda,
@@ -712,10 +691,38 @@ class GUIllaume
 
 	def updateConversation()
 		@convoArea['state'] = :normal
-		convo=@explorer.outputLineCollectionStr(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
 
 		@convoArea.delete(1.0, 'end')
-		@convoArea.insert(1.0, convo)
+
+		convo=@explorer.outputLineCollectionStr(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
+		@convoArea.tag_configure('markdownbold', :font=>'courier 12 bold')
+		@convoArea.tag_configure('markdownitalic', :font=>'courier 12 italic')
+		@convoArea.tag_configure('markdownblank', :font=>'courier 12')
+		# App.text.tag_configure('highlight', background='yellow' font='helvetica 14 bold', relief='raised')
+
+		if @browserMarkdown>0
+			convoarr=convo.split("\n")
+			convoarr.each do |line|
+				boldies=line.split("\*\*")
+				boldies.each_with_index do |bold,i|
+					if not i.even? then
+						@convoArea.insert("end", "**#{bold}**", "markdownbold")
+					else
+						itals= bold.split("\*")
+						itals.each_with_index do |ital, j|
+							if not j.even? then
+								@convoArea.insert("end", "*#{ital}*", "markdownitalic")
+							else
+								@convoArea.insert("end", ital, "markdownblank")
+							end
+						end
+					end
+				end
+				@convoArea.insert("end", "\n")
+			end
+		else
+			@convoArea.insert(1.0, convo)
+		end
 
 		# convo.each do |line|
 		# 	@convoArea.insert("end", line)
@@ -748,7 +755,7 @@ class GUIllaume
 				@chbuttoncommands=[]
 			end
 
-			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);traceLine} }
+			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);traceLine;@convoArea.see("end")} }
 			optionsStrs.each_with_index do |par, i|
 				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
 				row=(i.div(numberofbuttonstostack))
@@ -771,7 +778,7 @@ class GUIllaume
 			@parentButtons=[]
 			@pabuttoncommands=[]
 
-			@pabuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectBackTraceOpt(i);traceLine} }
+			@pabuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectBackTraceOpt(i);traceLine;@convoArea.see(1.0)} }
 			optionsStrs.each_with_index do |par, i|
 				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>100))
 				row=i.div(numberofbuttonstostack)
@@ -803,8 +810,23 @@ class GUIllaume
 		@searchlistbox.state="normal"
 		searchStr=@searchStr.value
 		searchResults=""
-		@searchByPhrase=false
-		@searchAnyWord=false
+
+		case @searchstyle
+		when "phrase"
+			@searchByPhrase=true
+			@searchAnyWord=false
+
+		when "all"
+			@searchByPhrase=false
+			@searchAnyWord=false
+		when "any"
+			@searchByPhrase=false
+			@searchAnyWord=true
+		else
+			@searchByPhrase=false
+			@searchAnyWord=false
+		end
+
 		@lineSearch=@explorer.searchlines(searchStr,@actorlimit,@searchByPhrase, @searchAnyWord)
 		@resultsCount.value=@lineSearch.length
 		itemsinbox=@searchlistbox.size
