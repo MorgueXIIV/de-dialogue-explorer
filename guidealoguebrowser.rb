@@ -252,8 +252,45 @@ class DialogueExplorer
 		return optionnum
 	end
 
-	# TODO refactor to RETURN not print the dump
-	def dialoguedump()
+	def lineFromArray(arrayOfInfo, lomg, markdown)
+		if markdown then
+			italic="*"
+			bold="**"
+		else
+			italic=""
+			bold=""
+		end
+
+		actor=arrayOfInfo[0]
+		dialoguetext=arrayOfInfo[1]
+		conditionstring=arrayOfInfo[2]
+		userscript=arrayOfInfo[3]
+		sequence=arrayOfInfo[4]
+		difficultypass=arrayOfInfo[5]
+		title=arrayOfInfo[6]
+
+		lomginfo=""
+		if lomg or dialoguetext.length<3 then
+			lomgpossinfo=[conditionstring,userscript,sequence]
+			lomgpossinfo.reject!{|info| info.nil? or info.length<2 }
+
+			if difficultypass>0 then
+				hardness=difficultypass+0
+				lomgpossinfo.unshift("passive #{actor} check, (difficulty #{hardness}-ish)")
+			end
+			lomginfo=lomgpossinfo.join(": ")
+		end
+		if dialoguetext.length<3
+			dialoguetext=title
+		end
+		strline="#{bold}#{actor}:#{bold} #{dialoguetext}"
+		if lomginfo.length>3
+			strline+="\n\t#{italic}#{lomginfo}#{italic}"
+		end
+		return strline
+	end
+
+	def dialoguedump(lomg=false, removehubs=false, markdown=false)
 		if lineSelected?
 			convoID=@nowLine.getConvoID
 		elsif collectionStarted
@@ -261,17 +298,62 @@ class DialogueExplorer
 		else
 			return false			
 		end 
+
+		# if markdown then
+		# 	italic="*"
+		# 	bold="**"
+		# else
+		# 	italic=""
+		# 	bold=""
+		# end
+
 		dumpStr=""
-		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
-		searchDias.each do |lineArray|
-			if lineArray[1]=="0" && lineArray.length>4 then
-				dumpStr.concat("#{lineArray[0]}: #{lineArray[4]}\n")
-			else
-				dumpStr.concat("#{lineArray[0]}: #{lineArray[1]}\n")
+		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
+
+		searchDias.each do |line|
+			if not (removehubs and line[1].length<3) then
+				dumpStr+=lineFromArray(line,lomg,markdown)+"\n"
 			end
-			bonusinfo=lineArray[2]+" : " +lineArray[3]
-			if bonusinfo.length>5
-				dumpStr.concat("\t #{bonusinfo} \n")
+		end
+
+		# if removehubs then
+		# 	searchDias.reject!{|e| e[1].length<3}
+		# end
+		# searchDias.map { |e| lineFromArray(e,lomg,markdown) }
+		# dumpStr=searchDias.join("\n")
+		# puts dumpStr
+
+
+		# searchDias.each do |lineArray|
+		# 	if lineArray[1]=="0" then
+		# 		if not removehubs then
+		# 			dumpStr.concat("#{lineArray[0]}: #{lineArray[4]}\n")
+		# 	else
+		# 		dumpStr.concat("#{lineArray[0]}: #{lineArray[1]}\n")
+		# 	end
+		# 	bonusinfo=lineArray[2]+" : " +lineArray[3]
+		# 	if bonusinfo.length>5
+		# 		dumpStr.concat("\t #{bonusinfo} \n")
+		# 	end
+		# end
+		return dumpStr
+	end
+
+	def actorDump(actorID,lomg=false, removehubs=false, markdown=false)
+		# if lineSelected?
+		# 	convoID=@nowLine.getConvoID
+		# elsif collectionStarted
+		# 	convoID=@lineCollection[0].getConvoID
+		# else
+		# 	return false			
+		# end 
+
+		dumpStr=""
+		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.actor='#{actorID}'"
+
+		searchDias.each do |line|
+			if not (removehubs and line[1].length<3) then
+				dumpStr+=lineFromArray(line,lomg,markdown)+"\n"
 			end
 		end
 		return dumpStr
@@ -279,24 +361,21 @@ class DialogueExplorer
 
 	# refactor to RETURN not output
 	def conversationinfo()
-		if @nowLine.nil?
-			puts "Which conversation ID?"
-			convoID=gets.chomp.to_i
-		else
+		if lineSelected?
 			convoID=@nowLine.getConvoID
+		elsif collectionStarted
+			convoID=@lineCollection[0].getConvoID
+		else
+			return false			
 		end
 		searchDias=$db.execute "SELECT title, description FROM dialogues WHERE id='#{convoID}'"
 		searchDias.each do |lineArray|
-			puts "#{lineArray[0]}: #{lineArray[1]}".colorize(:cyan)
+			return "#{lineArray[0]}: #{lineArray[1]}"
+			# .colorize(:cyan)
 		end
 	end 
 
-	def searchlines(searchQ=nil, actorlimit=false,byphrase=true, some=false)
-		# if searchQ.nil?
-		# 	#receive text input from command line,
-		# 	puts "Enter search query: (over 3 chars)"
-		# 	searchQ=gets.chomp
-		# end
+	def searchlines(searchQ=nil, actorlimit=0,byphrase=true, some=false)
 
 		#  remove " and 's with GSUB"
 		searchQ.gsub!("'", "_")
@@ -476,15 +555,21 @@ class GUIllaume
 		actorfind= proc{getNames}
 		actorfinde= proc{getNames(true)}
 		actorlose= proc{ungetNames}
+		actordump= proc{actorDump}
 		@searchnametextbox.bind('Key', actorfind)
 		@searchnametextbox.bind('Return', actorfinde)
+		@searchnametextbox.bind('FocusOut', actorfinde)
 		TkButton.new(@searchEntry, "text"=> 'clear', "command"=> actorlose).grid( :column => 5, :row => 3, :sticky => 'sewn')
+
+		@actorDump=TkButton.new(@searchEntry, "text"=> 'Actor Dump', "command"=> actordump, "state"=>"disabled").grid( :column => 4, :row => 3, :sticky => 'sewn')
 
 		@searchstyle = TkVariable.new
 		@searchstyle.value="all"
 		TkRadioButton.new(@searchEntry, "text" => 'exact phrase', "variable" => @searchstyle, "value" => 'phrase').grid( :column => 1, :row => 3, :sticky=>"e")
 		TkRadioButton.new(@searchEntry, "text" => 'all words', "variable" => @searchstyle, "value" => 'all').grid( :column => 2, :row => 3, :sticky=>"ew")
 		TkRadioButton.new(@searchEntry, "text" => 'any words', "variable" => @searchstyle, "value" => 'any').grid( :column => 3, :row => 3, :sticky=>"w")
+		# TkRadioButton.new(@searchEntry, "text" => 'all by Actor:', "variable" => @searchstyle, "value" => 'person', "state"=>"disabled").grid( :column => 3, :row => 3, :sticky=>"w")
+
 
 
 		@selectedLine = TkVariable.new
@@ -496,11 +581,11 @@ class GUIllaume
 		TkGrid.rowconfigure @searchEntry, 4, :weight => 1
 
 		begintrace=proc{traceLine}
-		@traceButton = TkButton.new(@searchEntry, "text"=> 'trace   line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>50).grid( :column => 4, :row => 4, :sticky => 'we')
+		@traceButton = TkButton.new(@searchEntry, "text"=> 'trace line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>100).grid( :column => 4, :row => 4, :sticky => 'we')
 		begindump=proc{dumpLine}
-		@dumpButton = TkButton.new(@searchEntry, "text"=> 'dump   convo ', "command"=> begindump, "state"=>"disabled", "wraplength"=>50).grid( :column => 5, :row => 4, :sticky => 'we')
+		@dumpButton = TkButton.new(@searchEntry, "text"=> 'dump conversation ', "command"=> begindump, "state"=>"disabled", "wraplength"=>100).grid( :column => 5, :row => 4, :sticky => 'we')
 
-		TkLabel.new(@searchEntry) {text 'we found;'}.grid( :column => 1, :row => 4, :sticky => 'e')
+		TkLabel.new(@searchEntry) {text 'found;'}.grid( :column => 1, :row => 4, :sticky => 'e')
 		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 4, :sticky => 'e');
 		TkLabel.new(@searchEntry) {text 'Dialogue Lines'}.grid( :column => 3, :row => 4, :sticky => 'w')
 
@@ -672,7 +757,6 @@ class GUIllaume
 
 		@dumpTextBox['yscrollcommand'] = proc{|*args| yds.set(*args);}
 		yds.command proc{|*args| @dumpTextBox.yview(*args);}
-		@convoArea.insert('end', "Dump Will Display Here ")
 	end
 
 	def lineSelect()
@@ -695,6 +779,7 @@ class GUIllaume
 				@actorlimit=actormatches[0][1]
 			end
 		end
+		@actorDump.state="normal"
 		if complete
 			actormatches.each do |result|
 				if @actorStr.value.chomp.casecmp(result[0])==0 then
@@ -710,6 +795,8 @@ class GUIllaume
 		@actorStr.value=""
 		@searchnametextbox.state="normal"
 		@actorlimit=0
+
+		@actorDump.state="disabled"
 
 	end
 
@@ -758,8 +845,74 @@ class GUIllaume
 		# @page3["state"]=:normal
 		@note.select(2)
 		@dumpTextBox.delete(1.0, 'end')
-		dump= @explorer.dialoguedump
-		@dumpTextBox.insert(1.0, dump)
+		dump= @explorer.dialoguedump(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
+
+		@dumpTextBox.tag_configure('markdownbold', :font=>'courier 12 bold')
+		@dumpTextBox.tag_configure('markdownitalic', :font=>'courier 12 italic')
+		@dumpTextBox.tag_configure('markdownblank', :font=>'courier 12')
+
+		if @browserMarkdown>0
+			convoarr=dump.split("\n")
+			convoarr.each do |line|
+				boldies=line.split("\*\*")
+				boldies.each_with_index do |bold,i|
+					if not i.even? then
+						@dumpTextBox.insert("end", "**#{bold}**", "markdownbold")
+					else
+						itals= bold.split("\*")
+						itals.each_with_index do |ital, j|
+							if not j.even? then
+								@dumpTextBox.insert("end", "*#{ital}*", "markdownitalic")
+							else
+								@dumpTextBox.insert("end", ital, "markdownblank")
+							end
+						end
+					end
+				end
+				@dumpTextBox.insert("end", "\n")
+			end
+		else
+			@dumpTextBox.insert(1.0, convo)
+		end
+
+		# @dumpTextBox.insert(1.0, dump)
+	end
+
+	def actorDump()
+		# @page3["state"]=:normal
+		@note.select(2)
+		@dumpTextBox.delete(1.0, 'end')
+		dump= @explorer.actorDump(@actorlimit,@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
+
+		@dumpTextBox.tag_configure('markdownbold', :font=>'courier 12 bold')
+		@dumpTextBox.tag_configure('markdownitalic', :font=>'courier 12 italic')
+		@dumpTextBox.tag_configure('markdownblank', :font=>'courier 12')
+
+		if @browserMarkdown>0
+			convoarr=dump.split("\n")
+			convoarr.each do |line|
+				boldies=line.split("\*\*")
+				boldies.each_with_index do |bold,i|
+					if not i.even? then
+						@dumpTextBox.insert("end", "**#{bold}**", "markdownbold")
+					else
+						itals= bold.split("\*")
+						itals.each_with_index do |ital, j|
+							if not j.even? then
+								@dumpTextBox.insert("end", "*#{ital}*", "markdownitalic")
+							else
+								@dumpTextBox.insert("end", ital, "markdownblank")
+							end
+						end
+					end
+				end
+				@dumpTextBox.insert("end", "\n")
+			end
+		else
+			@dumpTextBox.insert(1.0, convo)
+		end
+
+		# @dumpTextBox.insert(1.0, dump)
 	end
 
 	def traceLine()
