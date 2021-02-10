@@ -535,6 +535,7 @@ class GUIllaume
 	def initialize()
 		@actorlimit=0
 		@root = TkRoot.new { title "FAYDE Playback Experiment" }
+		# @root.iconbitmap('FAYDE-PbEx.ico')
 		# @root['minsize'] = 50, 50
 		# @root['maxsize'] = 70, 70
 
@@ -553,7 +554,7 @@ class GUIllaume
 		@note.add @page3, :text => 'Dialogue Dump', :state =>'normal'
 		
 		@pageLAST = TkFrame.new(@note)
-		@note.add @pageLAST, :text => 'configuration', :state =>'normal'
+		@note.add @pageLAST, :text => 'Display Options', :state =>'normal'
 
 		@note.grid(:row=>0,:column=>0,:sticky => 'news')
 
@@ -586,9 +587,9 @@ class GUIllaume
 		@searchnametextbox.bind('Key', actorfind)
 		@searchnametextbox.bind('Return', actorfinde)
 		@searchnametextbox.bind('FocusOut', actorfinde)
-		TkButton.new(@searchEntry, "text"=> 'clear', "command"=> actorlose).grid( :column => 5, :row => 3, :sticky => 'sewn')
+		@actorClear=TkButton.new(@searchEntry, "text"=> "Any Actor", "command"=> actorlose, "state"=>'disabled').grid( :column => 5, :row => 3, :sticky => 'sewn')
 
-		@actorDump=TkButton.new(@searchEntry, "text"=> 'Actor Dump', "command"=> actordump, "state"=>"disabled").grid( :column => 4, :row => 3, :sticky => 'sewn')
+		@actorDump=TkButton.new(@searchEntry, "text"=> 'Actor Dump', "command"=> actordump, "state"=>"disabled").grid( :column => 5, :row => 4, :sticky => 'sewn')
 
 		@searchstyle = TkVariable.new
 		@searchstyle.value="all"
@@ -607,10 +608,7 @@ class GUIllaume
 		TkGrid.columnconfigure @searchEntry, 1,:weight => 1
 		TkGrid.rowconfigure @searchEntry, 4, :weight => 1
 
-		begintrace=proc{traceLine}
-		@traceButton = TkButton.new(@searchEntry, "text"=> 'trace line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>100).grid( :column => 4, :row => 4, :sticky => 'we')
-		begindump=proc{dumpLine}
-		@dumpButton = TkButton.new(@searchEntry, "text"=> 'dump conversation ', "command"=> begindump, "state"=>"disabled", "wraplength"=>100).grid( :column => 5, :row => 4, :sticky => 'we')
+
 
 		TkLabel.new(@searchEntry) {text 'found;'}.grid( :column => 1, :row => 4, :sticky => 'e')
 		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 4, :sticky => 'e');
@@ -622,6 +620,11 @@ class GUIllaume
 
 		TkGrid.columnconfigure @resultsBox, 1, :weight => 1
 		TkGrid.rowconfigure @resultsBox, 1, :weight => 1
+
+		begintrace=proc{traceLine}
+		@traceButton = TkButton.new(@resultsBox, "text"=> 'trace line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>300).grid( :column => 1, :row => 4, :sticky => 'we')
+		begindump=proc{dumpLine}
+		@dumpButton = TkButton.new(@resultsBox, "text"=> 'dump conversation ', "command"=> begindump, "state"=>"disabled", "wraplength"=>300).grid( :column => 1, :row => 5, :sticky => 'we')
 
 		sel= proc{lineSelect}
 		@searchlistbox = TkListbox.new(@resultsBox) do
@@ -673,7 +676,7 @@ class GUIllaume
 		@underButtonFrame = TkFrame.new(@page2)
 		@underButtonFrame.grid(:column=>3,:row=>5, :sticky=>"sewn" )
 
-		@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 3; wrap "word"}
+		@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 2; wrap "word"}
 		@forwButtonArea.grid(:column => 0, :row => 1, :sticky => 'nwes')
 		TkGrid.columnconfigure(@underButtonFrame, 0, :weight => 1)
 		TkGrid.rowconfigure @underButtonFrame, 1, :weight => 1
@@ -687,7 +690,7 @@ class GUIllaume
 		@overButtonFrame = TkFrame.new(@page2)
 		@overButtonFrame.grid(:column=>3,:row=>1, :sticky=>"sewn" )
 
-		@backButtonArea = TkText.new(@overButtonFrame) {width 40; height 3; wrap "word"}
+		@backButtonArea = TkText.new(@overButtonFrame) {width 40; height 2; wrap "word"}
 		@backButtonArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
 		TkGrid.columnconfigure(@overButtonFrame, 0, :weight => 1)
 		TkGrid.rowconfigure @overButtonFrame, 0, :weight => 1
@@ -749,7 +752,7 @@ class GUIllaume
 		@dumpTextBox['yscrollcommand'] = proc{|*args| yds.set(*args);}
 		yds.command proc{|*args| @dumpTextBox.yview(*args);}
 
-		selectall=proc{@dumpTextBox.tag_add('sel', 1.0, 'end')}
+		selectall=proc{@dumpTextBox.tag_add('sel', 1.0, 'end');@dumpTextBox.mark_set("insert","end");@dumpTextBox.see("end")}
 		TkButton.new(@dumpDisplayArea, "text"=> 'Select All Text', "command"=> selectall).grid( :column => 0, :row => 5, :sticky => 'sewn')
 
 
@@ -791,11 +794,13 @@ class GUIllaume
 
 	    @fontOption = TkVariable.new
 		@fontOption.value="courier"
+		loadConfigs
 		dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
 		fontprev=proc{dispoptions['font'] = @fontOption.value}
 		TkRadioButton.new(@browseDisplayOptions, "text" => 'monospace', "variable" => @fontOption, "value" => 'courier',"command"=>fontprev).grid( :column => 3, :row => 1, :sticky=>"e")
 		TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
 		TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
+		TkButton.new(@browseDisplayOptions, "text"=> 'SAVE CONFIGS TO DB', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 5, :sticky => 'sewn')
 
 
 	end
@@ -812,21 +817,24 @@ class GUIllaume
 	end
 
 	def getNames(complete=false)
-		if @actorStr.value.chomp(' ').length>2
+		if @actorStr.value.chomp(' ').length>1
 			actormatches = $db.execute("Select name,id from actors where name like '%#{@actorStr.value}%'")
 			if actormatches.length==1
 				@actorStr.value=actormatches[0][0]
 				@searchnametextbox.state="disabled"
 				@actorlimit=actormatches[0][1]
+				@actorClear.state="normal"
+				@actorDump.state="normal"
 			end
-		end
-		@actorDump.state="normal"
-		if complete
-			actormatches.each do |result|
-				if @actorStr.value.chomp.casecmp(result[0])==0 then
-					@actorStr.value=result[0]
-					@searchnametextbox.state="disabled"
-					@actorlimit=result[1]
+			if complete
+				actormatches.each do |result|
+					if @actorStr.value.chomp.casecmp(result[0])==0 then
+						@actorStr.value=result[0]
+						@searchnametextbox.state="disabled"
+						@actorlimit=result[1]
+						@actorClear.state="normal"
+						@actorDump.state="normal"
+					end
 				end
 			end
 		end
@@ -836,9 +844,38 @@ class GUIllaume
 		@actorStr.value=""
 		@searchnametextbox.state="normal"
 		@actorlimit=0
-
 		@actorDump.state="disabled"
+		@actorClear.state="disabled"
+	end
 
+	def saveConfigs()
+		$db.execute "CREATE TABLE IF NOT EXISTS meta (tuple TEXT, value TEXT)"
+		$db.execute "delete from meta where tuple='font';"
+		$db.execute "delete from meta where tuple='markdown';"
+		$db.execute "delete from meta where tuple='hubsshow';"
+		$db.execute "delete from meta where tuple='detailshow';"
+
+
+		$db.execute "insert into meta(tuple,value) values ('font','#{@fontOption.value}');"
+		$db.execute "insert into meta(tuple,value) values ('markdown','#{@browserMarkdown.value}');"
+		$db.execute "insert into meta(tuple,value) values ('hubsshow','#{@browserHubs.value}');"
+		$db.execute "insert into meta(tuple,value) values ('detailshow','#{@browserShowMore.value}');"
+	end
+
+	def loadConfigs()
+		configs=$db.execute "select tuple,value from meta;"
+		configs.each do |config|
+			case config[0]
+			when 'font'
+				@fontOption.value=config[1]
+			when 'markdown'
+				@browserMarkdown.value=config[1]
+			when 'hubsshow'
+				@browserHubs.value=config[1]
+			when 'detailshow'
+				@browserShowMore.value=config[1]
+			end
+		end
 	end
 
 	def printText(areatoprint, texttoprint)
@@ -893,71 +930,15 @@ class GUIllaume
 		@convoDesc.value=@explorer.conversationinfo
 
 		printText(@dumpTextBox,dump)
-
-		# @dumpTextBox.tag_configure('markdownbold', :font=>'courier 12 bold')
-		# @dumpTextBox.tag_configure('markdownitalic', :font=>'courier 12 italic')
-		# @dumpTextBox.tag_configure('markdownblank', :font=>'courier 12')
-
-		# if @browserMarkdown>0
-		# 	convoarr=dump.split("\n")
-		# 	convoarr.each do |line|
-		# 		boldies=line.split("\*\*")
-		# 		boldies.each_with_index do |bold,i|
-		# 			if not i.even? then
-		# 				@dumpTextBox.insert("end", "**#{bold}**", "markdownbold")
-		# 			else
-		# 				itals= bold.split("\*")
-		# 				itals.each_with_index do |ital, j|
-		# 					if not j.even? then
-		# 						@dumpTextBox.insert("end", "*#{ital}*", "markdownitalic")
-		# 					else
-		# 						@dumpTextBox.insert("end", ital, "markdownblank")
-		# 					end
-		# 				end
-		# 			end
-		# 		end
-		# 		@dumpTextBox.insert("end", "\n")
-		# 	end
-		# else
-		# 	@dumpTextBox.insert(1.0, convo)
-		# end
-
-		# @dumpTextBox.insert(1.0, dump)
 	end
 
 	def actorDump()
 		# @page3["state"]=:normal
 		@note.select(2)
 		@dumpTextBox.delete(1.0, 'end')
-		dump= @explorer.actorDump(@actorlimit,@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
+		dump= @explorer.actorDump(@actorlimit,@browserShowMore>0,@browserHubs<1,true)
 
-		@dumpTextBox.tag_configure('markdownbold', :font=>'courier 12 bold')
-		@dumpTextBox.tag_configure('markdownitalic', :font=>'courier 12 italic')
-		@dumpTextBox.tag_configure('markdownblank', :font=>'courier 12')
-
-		if @browserMarkdown>0
-			convoarr=dump.split("\n")
-			convoarr.each do |line|
-				boldies=line.split("\*\*")
-				boldies.each_with_index do |bold,i|
-					if not i.even? then
-						@dumpTextBox.insert("end", "**#{bold}**", "markdownbold")
-					else
-						itals= bold.split("\*")
-						itals.each_with_index do |ital, j|
-							if not j.even? then
-								@dumpTextBox.insert("end", "*#{ital}*", "markdownitalic")
-							else
-								@dumpTextBox.insert("end", ital, "markdownblank")
-							end
-						end
-					end
-				end
-				@dumpTextBox.insert("end", "\n")
-			end
-		else
-			@dumpTextBox.insert(1.0, convo)
-		end
+		printText(@dumpTextBox,dump)
 	end
 
 	def traceLine()
