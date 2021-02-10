@@ -1,9 +1,6 @@
 require 'tk'
-
-# require "rubygems"
+# require 'bundler'
 require 'sqlite3'
-require 'pry'
-require "colorize"
 
 class DialogueEntry
 	def initialize(convoID,lineID)
@@ -39,6 +36,10 @@ class DialogueEntry
 
     end
 
+    def getTitle()
+    	return @title
+    end
+
     def getParents()
     	if @parents.nil? then
 	    	idsArray=$db.execute"SELECT originconversationid, origindialogueid FROM dlinks WHERE destinationconversationid='#{@conversationid}' AND destinationdialogueid='#{@id}'";
@@ -63,6 +64,58 @@ class DialogueEntry
 		return @children
 	end
 
+	def isHub?()
+		if @dialoguetext=="0"
+			return true
+		else
+			return false
+		end
+	end
+
+	def getLeastHubParentName(reverse=true)
+		grandparentslist=[]
+		greatgrandparentslist=[]
+		if self.isHub?
+			getParents()
+			@parents.each do |parent|
+				print "."
+				if not (parent.isHub?)
+					return parent.getTitle
+				else
+					grandparentslist+=parent.getParents
+				end
+			end
+			grandparentslist.each do |parent|
+				print "."
+				if not parent.isHub?
+					return parent.getTitle
+				else
+					greatgrandparentslist+=parent.getParents
+				end
+			end
+			greatgrandparentslist.each do |parent|
+				print "."
+				if not parent.isHub?
+					return parent.getTitle
+				else
+					greatgrandparentslist+=parent.getParents
+				end
+			end
+
+			# GIVE UP ?
+			return false
+
+		else
+			return "(this isn't a hub)"
+		end
+	end
+				# recurse= parent.getLeastHubParentName()
+				# if recurse then 
+				# 	return recurse
+
+
+
+
 
 	def to_s(lomg=false, markdown=false)
 		if markdown then
@@ -74,10 +127,11 @@ class DialogueEntry
 		end
 
 		lomginfo=extraInfo()
-		if @dialoguetext=="0" then
+		if isHub? then
 			if lomginfo.length<2 or lomginfo=="Continue()"
 				lomginfo=@title
 			end
+			lomginfo+= "(#{getLeastHubParentName})"
 			stringV = "\t#{ital}HUB: #{lomginfo}#{ital}"
 			#.colorize(:cyan)
 		else
@@ -299,14 +353,6 @@ class DialogueExplorer
 			return false			
 		end 
 
-		# if markdown then
-		# 	italic="*"
-		# 	bold="**"
-		# else
-		# 	italic=""
-		# 	bold=""
-		# end
-
 		dumpStr=""
 		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
 
@@ -315,38 +361,10 @@ class DialogueExplorer
 				dumpStr+=lineFromArray(line,lomg,markdown)+"\n"
 			end
 		end
-
-		# if removehubs then
-		# 	searchDias.reject!{|e| e[1].length<3}
-		# end
-		# searchDias.map { |e| lineFromArray(e,lomg,markdown) }
-		# dumpStr=searchDias.join("\n")
-		# puts dumpStr
-
-
-		# searchDias.each do |lineArray|
-		# 	if lineArray[1]=="0" then
-		# 		if not removehubs then
-		# 			dumpStr.concat("#{lineArray[0]}: #{lineArray[4]}\n")
-		# 	else
-		# 		dumpStr.concat("#{lineArray[0]}: #{lineArray[1]}\n")
-		# 	end
-		# 	bonusinfo=lineArray[2]+" : " +lineArray[3]
-		# 	if bonusinfo.length>5
-		# 		dumpStr.concat("\t #{bonusinfo} \n")
-		# 	end
-		# end
 		return dumpStr
 	end
 
 	def actorDump(actorID,lomg=false, removehubs=false, markdown=false)
-		# if lineSelected?
-		# 	convoID=@nowLine.getConvoID
-		# elsif collectionStarted
-		# 	convoID=@lineCollection[0].getConvoID
-		# else
-		# 	return false			
-		# end 
 
 		dumpStr=""
 		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.actor='#{actorID}'"
@@ -359,7 +377,7 @@ class DialogueExplorer
 		return dumpStr
 	end 
 
-	# refactor to RETURN not output
+
 	def conversationinfo()
 		if lineSelected?
 			convoID=@nowLine.getConvoID
@@ -382,23 +400,28 @@ class DialogueExplorer
 		searchQ.gsub!('"', "_")
 		maxsearch=0
 		#us SQL query to get the line IDs when they partial match the provided input string.
-		if byphrase then
-			query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+		if searchQ.strip.length==0 then
+			query="SELECT conversationid,id FROM dentries"
+			query+="and actor='#{actorlimit.to_i}'"
 		else
-			searchwords=searchQ.split(" ")
-			if searchwords.length>0 and searchwords.length<20 then
-				searchwords.reject!{|e| e.length<3}
-				query="SELECT conversationid,id FROM dentries WHERE "
-				searchwords.map! { |e| "(dentries.dialoguetext LIKE'%#{e}%')"}
-				boolop = some ? " or " : " and "
-				query.concat(searchwords.join(boolop))
-			else
+			if byphrase then
 				query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+			else
+				searchwords=searchQ.split(" ")
+				if searchwords.length>0 and searchwords.length<20 then
+					searchwords.reject!{|e| e.length<3}
+					query="SELECT conversationid,id FROM dentries WHERE "
+					searchwords.map! { |e| "(dentries.dialoguetext LIKE'%#{e}%')"}
+					boolop = some ? " or " : " and "
+					query.concat(searchwords.join(boolop))
+				else
+					query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+				end
 			end
-		end
 
-		if actorlimit.to_i>0
-			query+="and actor='#{actorlimit}'"
+			if actorlimit.to_i>0
+				query+="and actor='#{actorlimit.to_i}'"
+			end
 		end
 		if maxsearch<0
 			query+="limit #{maxsearch}"
@@ -528,6 +551,10 @@ class GUIllaume
 		@note.add @page1, :text => 'Search'
 		@note.add @page2, :text => 'Browse', :state=>"normal"
 		@note.add @page3, :text => 'Dialogue Dump', :state =>'normal'
+		
+		@pageLAST = TkFrame.new(@note)
+		@note.add @pageLAST, :text => 'configuration', :state =>'normal'
+
 		@note.grid(:row=>0,:column=>0,:sticky => 'news')
 
 		@searchEntry = TkFrame.new(@page1).grid(:sticky => 'new')
@@ -647,9 +674,9 @@ class GUIllaume
 		@underButtonFrame.grid(:column=>3,:row=>5, :sticky=>"sewn" )
 
 		@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 3; wrap "word"}
-		@forwButtonArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
+		@forwButtonArea.grid(:column => 0, :row => 1, :sticky => 'nwes')
 		TkGrid.columnconfigure(@underButtonFrame, 0, :weight => 1)
-		TkGrid.rowconfigure @underButtonFrame, 0, :weight => 1
+		TkGrid.rowconfigure @underButtonFrame, 1, :weight => 1
 
 		fbys = TkScrollbar.new(@underButtonFrame) {orient 'vertical'}
 		fbys.grid( :column => 1, :row => 0, :sticky => 'ns')
@@ -671,11 +698,6 @@ class GUIllaume
 		@backButtonArea['yscrollcommand'] = proc{|*args| bbys.set(*args);}
 		bbys.command proc{|*args| @backButtonArea.yview(*args);}
 
-
-		@browseDisplayOptions = TkFrame.new(@page2)
-		@browseDisplayOptions.grid(:column=>3, :row=>0, :sticky=>"sewn" )
-
-
 		TkGrid.columnconfigure @page2, 3, :weight => 1
 
 		TkGrid.rowconfigure @page2, 3, :weight => 3
@@ -683,40 +705,6 @@ class GUIllaume
 		TkGrid.rowconfigure @page2, 5, :weight => 1
 
 		upda=proc{updateConversation}
-
-		TkLabel.new(@browseDisplayOptions, "textvariable" => @selectedLine, "wraplength"=>400).grid( :column => 3,  :row => 1, :rowspan=>3, :sticky => 'w')
-		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
-		@browserMarkdown = TkVariable.new
-		@browserMarkdown.value = true
-		browsemarkcheckbox = TkCheckButton.new(@browseDisplayOptions,
-			"text"=>'add markdown?',
-	    	"command" =>upda,
-	    	"variable" =>@browserMarkdown,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
-	    browsemarkcheckbox.grid(:row=>1, :column=>5)
-
-		@browserHubs = TkVariable.new
-		@browserHubs.value = false 
-	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
-			"text"=>'show hubs?',
-	    	"command" =>upda,
-	    	"variable" =>@browserHubs,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
-	    browsehubscheckbox.grid(:row=>2, :column=>5)
-
-	    @browserShowMore = TkVariable.new
-		@browserShowMore.value = true
-	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
-			"text"=>'show details?',
-	    	"command" =>upda,
-	    	"variable" =>@browserShowMore,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
-	    browsehubscheckbox.grid(:row=>3, :column=>5)
-
-
 
 		@convoArea = TkText.new(@convoDisplayArea) {width 40; height 10; wrap "word"}
 		@convoArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
@@ -741,22 +729,75 @@ class GUIllaume
 
 
 		# PAGE 3:
+		@convoDesc=TkVariable.new()
 
 		@dumpDisplayArea = TkFrame.new(@page3)
 		@dumpDisplayArea.grid(:column=>3, :row=>3, :sticky=>"sewn" )
 		TkGrid.columnconfigure @page3, 3, :weight => 1
 		TkGrid.rowconfigure @page3, 3, :weight => 1
 
+		TkLabel.new(@dumpDisplayArea, "textvariable" => @convoDesc,"wraplength"=>500).grid( :column => 0, :row => 1, :sticky => 'ew');
+
 		@dumpTextBox = TkText.new(@dumpDisplayArea) {width 40; height 10; wrap "word"}
-		@dumpTextBox.grid(:column => 0, :row => 0, :sticky => 'nwes')
+		@dumpTextBox.grid(:column => 0, :row => 3, :sticky => 'nwes')
 		TkGrid.columnconfigure(@dumpDisplayArea, 0, :weight => 1)
-		TkGrid.rowconfigure @dumpDisplayArea, 0, :weight => 1
+		TkGrid.rowconfigure @dumpDisplayArea, 3, :weight => 1
 
 		yds = TkScrollbar.new(@dumpDisplayArea) {orient 'vertical'}
-		yds.grid( :column => 1, :row => 0, :sticky => 'ns')
+		yds.grid( :column => 1, :row => 3, :sticky => 'ns')
 
 		@dumpTextBox['yscrollcommand'] = proc{|*args| yds.set(*args);}
 		yds.command proc{|*args| @dumpTextBox.yview(*args);}
+
+		selectall=proc{@dumpTextBox.tag_add('sel', 1.0, 'end')}
+		TkButton.new(@dumpDisplayArea, "text"=> 'Select All Text', "command"=> selectall).grid( :column => 0, :row => 5, :sticky => 'sewn')
+
+
+		# PAGELAST
+
+		@browseDisplayOptions = TkFrame.new(@pageLAST)
+		@browseDisplayOptions.grid(:column=>3, :row=>0, :sticky=>"sewn" )
+
+		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
+		@browserMarkdown = TkVariable.new
+		@browserMarkdown.value = true
+		browsemarkcheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'add markdown?',
+	    	"command" =>upda,
+	    	"variable" =>@browserMarkdown,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsemarkcheckbox.grid(:row=>1, :column=>5,:sticky => 'w')
+
+		@browserHubs = TkVariable.new
+		@browserHubs.value = false 
+	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'show hubs?',
+	    	"command" =>upda,
+	    	"variable" =>@browserHubs,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsehubscheckbox.grid(:row=>2, :column=>5,:sticky => 'w')
+
+	    @browserShowMore = TkVariable.new
+		@browserShowMore.value = true
+	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'show details?',
+	    	"command" =>upda,
+	    	"variable" =>@browserShowMore,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsehubscheckbox.grid(:row=>3, :column=>5,:sticky => 'w')
+
+	    @fontOption = TkVariable.new
+		@fontOption.value="courier"
+		dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
+		fontprev=proc{dispoptions['font'] = @fontOption.value}
+		TkRadioButton.new(@browseDisplayOptions, "text" => 'monospace', "variable" => @fontOption, "value" => 'courier',"command"=>fontprev).grid( :column => 3, :row => 1, :sticky=>"e")
+		TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
+		TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
+
+
 	end
 
 	def lineSelect()
@@ -800,6 +841,40 @@ class GUIllaume
 
 	end
 
+	def printText(areatoprint, texttoprint)
+		areatoprint.tag_configure('markdownbold', :font=>"#{@fontOption} 12 bold")
+		areatoprint.tag_configure('markdownitalic', :font=>"#{@fontOption} 12 italic")
+		areatoprint.tag_configure('markdownblank', :font=>"#{@fontOption} 12")
+		# App.text.tag_configure('highlight', background='yellow' font='helvetica 14 bold', relief='raised')
+
+		if @browserMarkdown>0
+			italdelim="*"
+			bolddelim="**"
+		else
+			italdelim=""
+			bolddelim=""
+		end
+		convoarr=texttoprint.split("\n")
+		convoarr.each do |line|
+			boldies=line.split("\*\*")
+			boldies.each_with_index do |bold,i|
+				if not i.even? then
+					areatoprint.insert("end", "#{bolddelim}#{bold}#{bolddelim}", "markdownbold")
+				else
+					itals= bold.split("\*")
+					itals.each_with_index do |ital, j|
+						if not j.even? then
+							areatoprint.insert("end", "#{italdelim}#{ital}#{italdelim}", "markdownitalic")
+						else
+							areatoprint.insert("end", ital, "markdownblank")
+						end
+					end
+				end
+			end
+			areatoprint.insert("end", "\n")
+		end
+	end
+
 
 	def updateConversation()
 		@convoArea['state'] = :normal
@@ -807,73 +882,45 @@ class GUIllaume
 		@convoArea.delete(1.0, 'end')
 
 		convo=@explorer.outputLineCollectionStr(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
-		@convoArea.tag_configure('markdownbold', :font=>'courier 12 bold')
-		@convoArea.tag_configure('markdownitalic', :font=>'courier 12 italic')
-		@convoArea.tag_configure('markdownblank', :font=>'courier 12')
-		# App.text.tag_configure('highlight', background='yellow' font='helvetica 14 bold', relief='raised')
-
-		if @browserMarkdown>0
-			convoarr=convo.split("\n")
-			convoarr.each do |line|
-				boldies=line.split("\*\*")
-				boldies.each_with_index do |bold,i|
-					if not i.even? then
-						@convoArea.insert("end", "**#{bold}**", "markdownbold")
-					else
-						itals= bold.split("\*")
-						itals.each_with_index do |ital, j|
-							if not j.even? then
-								@convoArea.insert("end", "*#{ital}*", "markdownitalic")
-							else
-								@convoArea.insert("end", ital, "markdownblank")
-							end
-						end
-					end
-				end
-				@convoArea.insert("end", "\n")
-			end
-		else
-			@convoArea.insert(1.0, convo)
-		end
-
-		# convo.each do |line|
-		# 	@convoArea.insert("end", line)
-		# end
+		printText(@convoArea,convo)
 	end
 
 	def dumpLine()
 		# @page3["state"]=:normal
 		@note.select(2)
 		@dumpTextBox.delete(1.0, 'end')
-		dump= @explorer.dialoguedump(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
+		dump= @explorer.dialoguedump(@browserShowMore>0,@browserHubs<1,true)
+		@convoDesc.value=@explorer.conversationinfo
 
-		@dumpTextBox.tag_configure('markdownbold', :font=>'courier 12 bold')
-		@dumpTextBox.tag_configure('markdownitalic', :font=>'courier 12 italic')
-		@dumpTextBox.tag_configure('markdownblank', :font=>'courier 12')
+		printText(@dumpTextBox,dump)
 
-		if @browserMarkdown>0
-			convoarr=dump.split("\n")
-			convoarr.each do |line|
-				boldies=line.split("\*\*")
-				boldies.each_with_index do |bold,i|
-					if not i.even? then
-						@dumpTextBox.insert("end", "**#{bold}**", "markdownbold")
-					else
-						itals= bold.split("\*")
-						itals.each_with_index do |ital, j|
-							if not j.even? then
-								@dumpTextBox.insert("end", "*#{ital}*", "markdownitalic")
-							else
-								@dumpTextBox.insert("end", ital, "markdownblank")
-							end
-						end
-					end
-				end
-				@dumpTextBox.insert("end", "\n")
-			end
-		else
-			@dumpTextBox.insert(1.0, convo)
-		end
+		# @dumpTextBox.tag_configure('markdownbold', :font=>'courier 12 bold')
+		# @dumpTextBox.tag_configure('markdownitalic', :font=>'courier 12 italic')
+		# @dumpTextBox.tag_configure('markdownblank', :font=>'courier 12')
+
+		# if @browserMarkdown>0
+		# 	convoarr=dump.split("\n")
+		# 	convoarr.each do |line|
+		# 		boldies=line.split("\*\*")
+		# 		boldies.each_with_index do |bold,i|
+		# 			if not i.even? then
+		# 				@dumpTextBox.insert("end", "**#{bold}**", "markdownbold")
+		# 			else
+		# 				itals= bold.split("\*")
+		# 				itals.each_with_index do |ital, j|
+		# 					if not j.even? then
+		# 						@dumpTextBox.insert("end", "*#{ital}*", "markdownitalic")
+		# 					else
+		# 						@dumpTextBox.insert("end", ital, "markdownblank")
+		# 					end
+		# 				end
+		# 			end
+		# 		end
+		# 		@dumpTextBox.insert("end", "\n")
+		# 	end
+		# else
+		# 	@dumpTextBox.insert(1.0, convo)
+		# end
 
 		# @dumpTextBox.insert(1.0, dump)
 	end
@@ -911,8 +958,6 @@ class GUIllaume
 		else
 			@dumpTextBox.insert(1.0, convo)
 		end
-
-		# @dumpTextBox.insert(1.0, dump)
 	end
 
 	def traceLine()
@@ -972,17 +1017,17 @@ class GUIllaume
 			@forwButtonArea.state="disabled"
 
 				# ADD BACK BUTTONS
-				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(true);traceLine}, "wraplength"=>buttonwidth))
+				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> "Undo last backward step", "command" => proc{@explorer.removeLine(true);traceLine;@convoArea.see(1.0)}, "wraplength"=>buttonwidth))
 				i=@parentButtons.length
 				row=i.div(numberofbuttonstostack)+1
 
-				@parentButtons.last.grid(:row =>row, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
+				@parentButtons.last.grid(:row =>2, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
 
-				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(false);traceLine}, "wraplength"=>buttonwidth))
+				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> "Undo last forward step", "command" => proc{@explorer.removeLine(false);traceLine;@convoArea.see("end")}, "wraplength"=>buttonwidth))
 				i=@childButtons.length
 				row=i.div(numberofbuttonstostack)+1
 
-				@childButtons.last.grid(:row =>row, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
+				@childButtons.last.grid(:row =>0, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
 			updateConversation
 
 		end
