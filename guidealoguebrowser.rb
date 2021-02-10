@@ -561,8 +561,30 @@ class GUIllaume
 		@underButtonFrame = TkFrame.new(@page2)
 		@underButtonFrame.grid(:column=>3,:row=>5, :sticky=>"sewn" )
 
+		@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 3; wrap "word"}
+		@forwButtonArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
+		TkGrid.columnconfigure(@underButtonFrame, 0, :weight => 1)
+		TkGrid.rowconfigure @underButtonFrame, 0, :weight => 1
+
+		fbys = TkScrollbar.new(@underButtonFrame) {orient 'vertical'}
+		fbys.grid( :column => 1, :row => 0, :sticky => 'ns')
+
+		@forwButtonArea['yscrollcommand'] = proc{|*args| fbys.set(*args);}
+		fbys.command proc{|*args| @forwButtonArea.yview(*args);}
+
 		@overButtonFrame = TkFrame.new(@page2)
 		@overButtonFrame.grid(:column=>3,:row=>1, :sticky=>"sewn" )
+
+		@backButtonArea = TkText.new(@overButtonFrame) {width 40; height 3; wrap "word"}
+		@backButtonArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
+		TkGrid.columnconfigure(@overButtonFrame, 0, :weight => 1)
+		TkGrid.rowconfigure @overButtonFrame, 0, :weight => 1
+
+		bbys = TkScrollbar.new(@overButtonFrame) {orient 'vertical'}
+		bbys.grid( :column => 1, :row => 0, :sticky => 'ns')
+
+		@backButtonArea['yscrollcommand'] = proc{|*args| bbys.set(*args);}
+		bbys.command proc{|*args| @backButtonArea.yview(*args);}
 
 
 		@browseDisplayOptions = TkFrame.new(@page2)
@@ -570,7 +592,10 @@ class GUIllaume
 
 
 		TkGrid.columnconfigure @page2, 3, :weight => 1
-		TkGrid.rowconfigure @page2, 3, :weight => 1
+
+		TkGrid.rowconfigure @page2, 3, :weight => 3
+		TkGrid.rowconfigure @page2, 1, :weight => 1
+		TkGrid.rowconfigure @page2, 5, :weight => 1
 
 		upda=proc{updateConversation}
 
@@ -739,8 +764,12 @@ class GUIllaume
 
 	def traceLine()
 		# @page2["state"]=:normal
+		@backButtonArea.state="normal"
+		@forwButtonArea.state="normal"
 		@note.select(1)
 		numberofbuttonstostack=5
+		buttonwidth=250
+
 		if @explorer.collectionStarted
 			@explorer.traceBackOrForth(false)
 			optionsStrs=@explorer.getForwardOptStrs
@@ -757,11 +786,11 @@ class GUIllaume
 
 			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);traceLine;@convoArea.see("end")} }
 			optionsStrs.each_with_index do |par, i|
-				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>100))
-				row=(i.div(numberofbuttonstostack))
-				col=(i%numberofbuttonstostack)
-
-				@childButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
+				@childButtons.push(TkButton.new(@forwButtonArea, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>buttonwidth))
+				TkTextWindow.new(@forwButtonArea, "end", :window => @childButtons[i])
+				# row=(i.div(numberofbuttonstostack))
+				# col=(i%numberofbuttonstostack)
+				# @childButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
 
 
@@ -780,21 +809,23 @@ class GUIllaume
 
 			@pabuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectBackTraceOpt(i);traceLine;@convoArea.see(1.0)} }
 			optionsStrs.each_with_index do |par, i|
-				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>100))
-				row=i.div(numberofbuttonstostack)
-				col=(i%numberofbuttonstostack)
-
-				@parentButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
+				@parentButtons.push(TkButton.new(@backButtonArea, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>buttonwidth))
+				TkTextWindow.new(@backButtonArea, "end", :window => @parentButtons[i])
+				# row=i.div(numberofbuttonstostack)
+				# col=(i%numberofbuttonstostack)
+				# @parentButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
+			@backButtonArea.state="disabled"
+			@forwButtonArea.state="disabled"
 
 				# ADD BACK BUTTONS
-				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(true);traceLine}, "wraplength"=>100))
+				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(true);traceLine}, "wraplength"=>buttonwidth))
 				i=@parentButtons.length
 				row=i.div(numberofbuttonstostack)+1
 
 				@parentButtons.last.grid(:row =>row, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
 
-				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(false);traceLine}, "wraplength"=>100))
+				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> "backstep", "command" => proc{@explorer.removeLine(false);traceLine}, "wraplength"=>buttonwidth))
 				i=@childButtons.length
 				row=i.div(numberofbuttonstostack)+1
 
