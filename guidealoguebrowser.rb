@@ -175,7 +175,6 @@ class DialogueEntry
 		if self.isHub?
 			getParents()
 			@parents.each do |parent|
-				print "."
 				if not (parent.isHub?)
 					return parent.getTitle
 				else
@@ -183,7 +182,6 @@ class DialogueEntry
 				end
 			end
 			grandparentslist.each do |parent|
-				print "."
 				if not parent.isHub?
 					return parent.getTitle
 				else
@@ -191,7 +189,6 @@ class DialogueEntry
 				end
 			end
 			greatgrandparentslist.each do |parent|
-				print "."
 				if not parent.isHub?
 					return parent.getTitle
 				else
@@ -909,16 +906,37 @@ class GUIllaume
 	    browsealtscheckbox.grid(:row=>4, :column=>5,:sticky => 'w')
 
 	    @fontOption = TkVariable.new
-		@fontOption.value="courier"
-		dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
-		fontprev=proc{dispoptions['font'] = @fontOption.value}
-		TkRadioButton.new(@browseDisplayOptions, "text" => 'monospace', "variable" => @fontOption, "value" => 'courier',"command"=>fontprev).grid( :column => 3, :row => 1, :sticky=>"e")
-		TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
-		TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
+		@fontOption.value="courier 12"
+		@dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
+		fontprev=proc{@dispoptions['font'] = @fontOption.value}
+		# TkRadioButton.new(@browseDisplayOptions, "text" => 'monospace', "variable" => @fontOption, "value" => 'courier 12',"command"=>fontprev).grid( :column => 3, :row => 1, :sticky=>"e")
+		# TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times 12',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
+		# TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica 12',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
 
 		TkButton.new(@browseDisplayOptions, "text"=> 'SAVE CONFIGS TO DB', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 10, :sticky => 'sewn')
 
+		TkFont::Fontchooser.configure :font => "courier 12", :command => proc{|f| font_changed(f);}
+
+		fontget=proc{TkFont::Fontchooser.show}
+
+		TkButton.new(@browseDisplayOptions, "text"=> 'Font Options', "command"=> fontget).grid( :column => 3, :row => 2, :sticky => 'sewn')
+
+		# TkFont::Fontchooser.hide
+
 		loadConfigs
+
+	end
+
+
+	def font_changed(font)
+		@fontOption.value = font
+		@dispoptions['font'] = @fontOption.value
+		fontUsers=[@convoArea,@dumpTextBox]
+		fontUsers.each do |textarea|
+			textarea.tag_configure('markdownbold', :font=>"#{@fontOption} bold")
+			textarea.tag_configure('markdownitalic', :font=>"#{@fontOption} italic")
+			textarea.tag_configure('markdownblank', :font=>"#{@fontOption}")
+		end
 
 	end
 
@@ -999,9 +1017,9 @@ class GUIllaume
 	end
 
 	def printText(areatoprint, texttoprint)
-		areatoprint.tag_configure('markdownbold', :font=>"#{@fontOption} 12 bold")
-		areatoprint.tag_configure('markdownitalic', :font=>"#{@fontOption} 12 italic")
-		areatoprint.tag_configure('markdownblank', :font=>"#{@fontOption} 12")
+		areatoprint.tag_configure('markdownbold', :font=>"#{@fontOption} bold")
+		areatoprint.tag_configure('markdownitalic', :font=>"#{@fontOption} italic")
+		areatoprint.tag_configure('markdownblank', :font=>"#{@fontOption}")
 		# App.text.tag_configure('highlight', background='yellow' font='helvetica 14 bold', relief='raised')
 
 		if @browserMarkdown>0
