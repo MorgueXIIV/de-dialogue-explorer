@@ -26,4 +26,4 @@ Once you've found your line of choice, you can select 'trace line', which allows
 
 I'm sure there's more (or will be by the time i'm done writing this because morgue codes like a demon on speed) but quite honestly I can't remember it right now, sorry. I'm sure I'll update this at some point. Probably.
 
-Please blame any and all mistakes and/or terrible jokes in this readme on me (Zeiat), Morgue had nothing to do with this monstrosity. Enjoy <s>mainlining kim kitsuragi quotes</s> using the FAYDE Playback Experiment!
+Please blame any and all mistakes and/or terrible jokes in this readme on me (Zeiat), Morgue had nothing to do with this monstrosity. Enjoy *coughmainlining kim kitsuragi quotescough* using the FAYDE Playback Experiment!
