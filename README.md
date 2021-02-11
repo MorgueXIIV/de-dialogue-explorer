@@ -12,9 +12,7 @@ If you're not using Windows, for some reason I assume you already know how to do
 
 4) Type 'bundler install' and press enter.
 
-5) Type 'ruby dealogueimport.db' and press enter. This will take a moment.
-
-6) Finally, type 'ruby guidealoguebrowser.rb' and press enter. Then get a drink because this will /definitely/ take a moment.
+5) Finally, type 'ruby guidealoguebrowser.rb' and press enter. Then get a drink because this will /take a moment/.
 
 How to navigate:
 
