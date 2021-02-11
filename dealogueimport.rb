@@ -77,6 +77,26 @@ def getCheckModifiersArrays(lineCheck)
 	return modifierList
 end
 
+def getLineAlternatesArrays(lineCheck)
+	altList=[]
+	lineID=[getCLAttribute(lineCheck,"conversationID"), getCLAttribute(lineCheck, "id")]
+	i=1
+	for i in 1..10 do
+		alternate=getCLAttribute(lineCheck,"Alternate#{i}")
+		if (alternate!=0 and alternate.length>1) then
+			condition=getCLAttribute(lineCheck,"Condition#{i}")
+			thisAlt=[]
+			thisAlt[0]=lineID[0]
+			thisAlt[1]=lineID[1]
+			thisAlt.push(condition,alternate)
+			altList.push(thisAlt)
+		else
+			break;
+		end
+	end
+	return altList
+end
+
 
 def getArrayForDB(hashToInspect, arrayOfAttributes)
 	arrayOfData = []
@@ -170,6 +190,23 @@ begin
 	variable TEXT, modifier INT, tooltip TEXT,
   	FOREIGN KEY (conversationid,dialogueid) REFERENCES checks(conversationid, dialogueid))""";
 
+  	# Database Table for Alternate Lines
+
+  	db.execute """CREATE TABLE IF NOT EXISTS alternates
+	(conversationid INT, dialogueid INT,
+	condition TEXT, alternateline TEXT,
+  	FOREIGN KEY (conversationid,dialogueid) REFERENCES dentries(conversationid, id))""";
+
+
+
+  	version = dealogues['version']
+  	db.execute "CREATE TABLE IF NOT EXISTS meta (tuple TEXT, value TEXT)"
+  	versionsindb=db.execute "SELECT * FROM meta WHERE tuple='version-date'"
+  	versionsindb.flatten!
+  	if versionsindb.index(version).nil?
+  		db.execute "insert into meta(tuple,value) values ('version-date','#{version}');"
+  	end
+
 	# these strings represent the various keys we need from each hash to fed into the database
 	# stored in an ITERABLE array so we can easily use them in a method for a nice DRY grab of data to insert
 	listOfLineAtts=["id","Title","Dialogue Text","Sequence","Actor","Conversant","conversationID", "DifficultyPass","isGroup","conditionsString","userScript"]
@@ -186,6 +223,7 @@ begin
 	doChecks=false
 	doModifiers=false
 	doActorTalkativeness=false
+	doAlternateLines=true
 
 	#inistialise counter
 	numberOfdbEntriesMade=0;
@@ -225,6 +263,7 @@ begin
 		#SUB LOOP; for every conversation we also need to enter the many sub-lines of that conversation
 		for thisLine in thisConvo["dialogueEntries"] do
 			checkData=getIsCheckAttributes(thisLine)
+			altData=getLineAlternatesArrays(thisLine)
 			if doDentries then
 				lineAtts=[]
 				lineAtts=getArrayForDB(thisLine,listOfLineAtts);
@@ -235,7 +274,13 @@ begin
 					lineAtts.push(0)
 				end
 
-				db.execute "INSERT INTO dentries (id, title, dialoguetext, sequence, actor, conversant, conversationid,difficultypass,isgroup,conditionstring,userscript,hascheck) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)", lineAtts;
+				if not altData.empty? then
+					lineAtts.push(1)
+				else
+					lineAtts.push(0)
+				end
+
+				db.execute "INSERT INTO dentries (id, title, dialoguetext, sequence, actor, conversant, conversationid,difficultypass,isgroup,conditionstring,userscript,hascheck,hasalts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", lineAtts;
 				numberOfdbEntriesMade+=1;
 			end
 
@@ -255,6 +300,17 @@ begin
 					end
 				end
 			end
+
+
+			if doAlternateLines
+				if !(altData.nil? or altData.empty?) 
+					altData.each do |alt|
+						db.execute "INSERT INTO alternates (conversationid, dialogueid, condition, alternateline) VALUES (?,?,?,?)", alt;
+						numberOfdbEntriesMade+=1;
+					end
+				end
+			end
+
 			#add ANOTHER loop which enters any outgoing links to the links database IF they exist;
 			if doDlinks
 				if thisLine.has_key?("outgoingLinks") then

@@ -33,7 +33,6 @@ class DialogueEntry
 		@conditionstring=dialogueArray[10]
 		@userscript=dialogueArray[11]
 		@difficultypass=dialogueArray[12]
-
     end
 
     def getTitle()
@@ -72,6 +71,104 @@ class DialogueEntry
 		end
 	end
 
+	def getCheck()
+		if not @checkDataHash.nil?
+			return @checkDataHash
+		elsif @hascheck>0
+			check=$db.execute "SELECT isred,difficulty,flagname,forced,skilltype FROM checks WHERE conversationid='#{@conversationid}' AND dialogueid='#{@id}'"
+			if check.empty? then
+				@checkDataHash=false
+			else
+				check=check[0]
+				@checkDataHash={"isred"=>check[0],"difficulty"=>check[1],"flag"=>check[2],"forced"=>check[3],"skill"=>check[4]}
+			end
+		else
+			@checkDataHash=false
+		end
+		return @checkDataHash
+	end
+
+	def getModifiers()
+		if @modifiers.nil? then
+			if @hascheck>0
+				modifiers=$db.execute "SELECT tooltip,modifier,variable FROM modifiers WHERE conversationid='#{@conversationid}' AND dialogueid='#{@id}'"
+				if modifiers.empty?
+					@modifiers=false
+				else
+					@modifiers=modifiers
+				end
+			end
+		end
+		return @modifiers
+	end
+
+	def getAlternates()
+		if @alternates.nil? then
+			if @hasalts>0
+				alts=$db.execute "SELECT condition,alternateline FROM alternates WHERE conversationid='#{@conversationid}' AND dialogueid='#{@id}'"
+				if alts.empty?
+					@alternates=false
+				else
+					@alternates=alts
+				end
+			else
+				@alternates=false
+			end
+		end
+		return @alternates
+	end
+
+	def getCheckString(showModifiers=true,markdown=true)
+		if markdown then
+			ital = "*"
+			bold = "**"
+		else
+			ital=""
+			bold=""
+		end
+		check=getCheck()
+		stringcheck=""
+		if check then
+			stringcheck="\n\t#{ital}#{check["skill"]} "
+			if check['isred']>0
+				stringcheck+= " RED check#{ital}"
+			else
+				stringcheck+= " WHITE check#{ital}"
+			end
+			stringcheck+="\n\t #{ital}Difficulty: #{check["difficulty"]}#{ital} \n \t#{ital}(flag: #{check["flag"]})#{ital} "
+		end
+		if showModifiers then
+			mods=getModifiers
+			if mods then
+				mods.each do |mod|
+					stringcheck+="\n\t\t #{ital}#{mod[1]} #{mod[0]}#{ital} \n\t\t #{ital}(#{mod[2]})#{ital} "
+				end
+			end
+		end
+		return stringcheck
+	end
+
+	def getAltStrings(markdown=true)
+		if markdown then
+			ital = "*"
+			bold = "**"
+		else
+			ital=""
+			bold=""
+		end
+
+		stringalts=""
+		alts=getAlternates
+		if alts then
+			alts.each do |alt|
+				stringalts+="\n\t #{ital}(replaced with:#{alt[1]}#{ital} "
+				stringalts+= "\n\t #{ital}if #{alt[0]})#{ital} "
+			end
+		end
+		return stringalts
+	end
+
+
 	def getLeastHubParentName(reverse=true)
 		grandparentslist=[]
 		greatgrandparentslist=[]
@@ -103,21 +200,13 @@ class DialogueEntry
 			end
 
 			# GIVE UP ?
-			return false
-
+			return "(no useful parent)"
 		else
 			return "(this isn't a hub)"
 		end
 	end
-				# recurse= parent.getLeastHubParentName()
-				# if recurse then 
-				# 	return recurse
 
-
-
-
-
-	def to_s(lomg=false, markdown=false)
+	def to_s(lomg=false, markdown=false,check=false,altshow=true)
 		if markdown then
 			ital = "*"
 			bold = "**"
@@ -132,16 +221,24 @@ class DialogueEntry
 				lomginfo=@title
 			end
 			lomginfo+= "(#{getLeastHubParentName})"
-			stringV = "\t#{ital}HUB: #{lomginfo}#{ital}"
+			stringV = "\t#{ital}HUB: #{lomginfo}#{ital} "
 			#.colorize(:cyan)
 		else
 			stringV = "#{bold}#{@actor}:#{bold} #{@dialoguetext}"
 			# ".light_blue.bold+"
-			if lomg and lomginfo.length > 1
-				stringV.concat("\n\t#{ital}#{lomginfo}#{ital}")
+			if (lomg and lomginfo.length > 1)
+				stringV.concat("\n\t#{ital}#{lomginfo}#{ital} ")
+			end
+
+			if check then
+				checkinfo=getCheckString(true,markdown)
+				stringV.concat("#{checkinfo} ")
+			end
+			if altshow then
+				alts=getAltStrings(markdown)
+				stringV.concat("#{alts} ")
 			end
 		end
-
 		return stringV
 	end
 
@@ -194,8 +291,8 @@ class DialogueExplorer
 		end
 	end
 
-	def outputLineCollectionStr(lomg=false, removehubs=false, markdown=false)
-		lineCollStr = @lineCollection.map { |e| e.to_s(lomg, markdown) }
+	def outputLineCollectionStr(lomg=false, removehubs=false, markdown=false,showchecks=true,showalts=false)
+		lineCollStr = @lineCollection.map { |e| e.to_s(lomg, markdown,showchecks,showalts) }
 			if removehubs then
 				lineCollStr.select! {|e| (e["HUB"]).nil?}
 			end
@@ -333,6 +430,14 @@ class DialogueExplorer
 				lomgpossinfo.unshift("passive #{actor} check, (difficulty #{hardness}-ish)")
 			end
 			lomginfo=lomgpossinfo.join(": ")
+			if arrayOfInfo.length>=9 then
+				if arrayOfInfo[7]>0 and lomg then
+					lomginfo+=" (has an active check) "
+				end
+				if arrayOfInfo[8]>0 and lomg then
+					lomginfo+=" (has alternate lines) "
+				end
+			end
 		end
 		if dialoguetext.length<3
 			dialoguetext=title
@@ -354,7 +459,7 @@ class DialogueExplorer
 		end 
 
 		dumpStr=""
-		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
+		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title, dentries.hascheck, dentries.hasalts FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.conversationid='#{convoID}'"
 
 		searchDias.each do |line|
 			if not (removehubs and line[1].length<3) then
@@ -367,7 +472,7 @@ class DialogueExplorer
 	def actorDump(actorID,lomg=false, removehubs=false, markdown=false)
 
 		dumpStr=""
-		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.actor='#{actorID}'"
+		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title, dentries.hascheck, dentries.hasalts FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.actor='#{actorID}'"
 
 		searchDias.each do |line|
 			if not (removehubs and line[1].length<3) then
@@ -754,6 +859,7 @@ class GUIllaume
 
 		selectall=proc{@dumpTextBox.tag_add('sel', 1.0, 'end');@dumpTextBox.mark_set("insert","end");@dumpTextBox.see("end")}
 		TkButton.new(@dumpDisplayArea, "text"=> 'Select All Text', "command"=> selectall).grid( :column => 0, :row => 5, :sticky => 'sewn')
+		TkLabel.new(@dumpDisplayArea, "text" => "Apologies, for performance reasons, these dumps do not show red checks or alternate lines, these can only be viewed in the conversation browser.","wraplength"=>500).grid( :column => 0, :row => 10, :sticky => 'ew');
 
 
 		# PAGELAST
@@ -765,7 +871,7 @@ class GUIllaume
 		@browserMarkdown = TkVariable.new
 		@browserMarkdown.value = true
 		browsemarkcheckbox = TkCheckButton.new(@browseDisplayOptions,
-			"text"=>'add markdown?',
+			"text"=>'show markdown tags?',
 	    	"command" =>upda,
 	    	"variable" =>@browserMarkdown,
 	    	"onvalue" => true, 
@@ -784,24 +890,35 @@ class GUIllaume
 
 	    @browserShowMore = TkVariable.new
 		@browserShowMore.value = true
-	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
+	    browselomgcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show details?',
 	    	"command" =>upda,
 	    	"variable" =>@browserShowMore,
 	    	"onvalue" => true, 
 	    	"offvalue" => false)
-	    browsehubscheckbox.grid(:row=>3, :column=>5,:sticky => 'w')
+	    browselomgcheckbox.grid(:row=>3, :column=>5,:sticky => 'w')
+
+	    @browserShowAlts = TkVariable.new
+		@browserShowAlts.value = true
+	    browsealtscheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'show alternate lines?',
+	    	"command" =>upda,
+	    	"variable" =>@browserShowAlts,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsealtscheckbox.grid(:row=>4, :column=>5,:sticky => 'w')
 
 	    @fontOption = TkVariable.new
 		@fontOption.value="courier"
-		loadConfigs
 		dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
 		fontprev=proc{dispoptions['font'] = @fontOption.value}
 		TkRadioButton.new(@browseDisplayOptions, "text" => 'monospace', "variable" => @fontOption, "value" => 'courier',"command"=>fontprev).grid( :column => 3, :row => 1, :sticky=>"e")
 		TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
 		TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
-		TkButton.new(@browseDisplayOptions, "text"=> 'SAVE CONFIGS TO DB', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 5, :sticky => 'sewn')
 
+		TkButton.new(@browseDisplayOptions, "text"=> 'SAVE CONFIGS TO DB', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 10, :sticky => 'sewn')
+
+		loadConfigs
 
 	end
 
@@ -854,12 +971,13 @@ class GUIllaume
 		$db.execute "delete from meta where tuple='markdown';"
 		$db.execute "delete from meta where tuple='hubsshow';"
 		$db.execute "delete from meta where tuple='detailshow';"
-
+		$db.execute "delete from meta where tuple='altsshow';"
 
 		$db.execute "insert into meta(tuple,value) values ('font','#{@fontOption.value}');"
 		$db.execute "insert into meta(tuple,value) values ('markdown','#{@browserMarkdown.value}');"
 		$db.execute "insert into meta(tuple,value) values ('hubsshow','#{@browserHubs.value}');"
 		$db.execute "insert into meta(tuple,value) values ('detailshow','#{@browserShowMore.value}');"
+		$db.execute "insert into meta(tuple,value) values ('altsshow','#{@browserShowAlts.value}');"
 	end
 
 	def loadConfigs()
@@ -874,6 +992,8 @@ class GUIllaume
 				@browserHubs.value=config[1]
 			when 'detailshow'
 				@browserShowMore.value=config[1]
+			when 'altsshow'
+				@browserShowAlts.value=config[1]
 			end
 		end
 	end
@@ -918,7 +1038,8 @@ class GUIllaume
 
 		@convoArea.delete(1.0, 'end')
 
-		convo=@explorer.outputLineCollectionStr(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0)
+		convo=@explorer.outputLineCollectionStr(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0,true,@browserShowAlts>0)
+
 		printText(@convoArea,convo)
 	end
 
@@ -942,7 +1063,7 @@ class GUIllaume
 	end
 
 	def traceLine()
-		# @page2["state"]=:normal
+		# @page2.state="normal"
 		@backButtonArea.state="normal"
 		@forwButtonArea.state="normal"
 		@note.select(1)
@@ -967,12 +1088,7 @@ class GUIllaume
 			optionsStrs.each_with_index do |par, i|
 				@childButtons.push(TkButton.new(@forwButtonArea, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>buttonwidth))
 				TkTextWindow.new(@forwButtonArea, "end", :window => @childButtons[i])
-				# row=(i.div(numberofbuttonstostack))
-				# col=(i%numberofbuttonstostack)
-				# @childButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
-
-
 
 			@explorer.traceBackOrForth(true)
 			optionsStrs=@explorer.getBackwardOptStrs
@@ -990,30 +1106,22 @@ class GUIllaume
 			optionsStrs.each_with_index do |par, i|
 				@parentButtons.push(TkButton.new(@backButtonArea, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>buttonwidth))
 				TkTextWindow.new(@backButtonArea, "end", :window => @parentButtons[i])
-				# row=i.div(numberofbuttonstostack)
-				# col=(i%numberofbuttonstostack)
-				# @parentButtons[i].grid(:row =>row, :column => col, :sticky => 'sewn')
 			end
 			@backButtonArea.state="disabled"
 			@forwButtonArea.state="disabled"
 
 				# ADD BACK BUTTONS
 				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> "Undo last backward step", "command" => proc{@explorer.removeLine(true);traceLine;@convoArea.see(1.0)}, "wraplength"=>buttonwidth))
-				i=@parentButtons.length
-				row=i.div(numberofbuttonstostack)+1
 
 				@parentButtons.last.grid(:row =>2, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
 
 				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> "Undo last forward step", "command" => proc{@explorer.removeLine(false);traceLine;@convoArea.see("end")}, "wraplength"=>buttonwidth))
-				i=@childButtons.length
-				row=i.div(numberofbuttonstostack)+1
 
 				@childButtons.last.grid(:row =>0, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
 			updateConversation
 
 		end
 	end
-
 
 
 	def makeSearchResults()
@@ -1056,9 +1164,6 @@ begin
     GUIllaume.new()
 	
 	Tk.mainloop
-
-    # commenting out because creating this is now handled in the GUI for scope reasons
-    # ourprogram=DialogueExplorer.new()
 
 # #error handling.
 rescue SQLite3::Exception => e 
