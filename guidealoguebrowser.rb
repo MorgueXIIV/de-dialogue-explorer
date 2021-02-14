@@ -304,7 +304,7 @@ class DialogueExplorer
 	def outputLineCollectionArr()
 		lineCollArr=[]
 		@lineCollection.each do |line|
-			lineCollArr.push(line)
+			lineCollArr.push(line.to_s)
 		end
 		return lineCollArr
 	end
@@ -463,32 +463,26 @@ class DialogueExplorer
 		searchQ.gsub!('"', "_")
 		maxsearch=0
 		#us SQL query to get the line IDs when they partial match the provided input string.
-		#dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.hascheck, dentries.hasalts 
-
-
-		# 
-		# 	query="SELECT conversationid,id FROM dentries where actor='#{actorlimit.to_i}'"
-
+		#for performance reasons, willl no longer get the IDs and make objects, that was INSANELY slow
 		query= "SELECT dentries.conversationid,dentries.id,actors.name, dentries.dialoguetext, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id "
-			if if searchQ.strip.length==0 then
-				query+= " where actor='#{actorlimit.to_i}'"
-			elsif byphrase then
-				query= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+		if searchQ.strip.length==0 then
+			query+= " where actor='#{actorlimit.to_i}'"
+		elsif byphrase then
+			query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+		else
+			searchwords=searchQ.split(" ")
+			searchwords.reject!{|e| e.length<3}
+			if searchwords.length>0 and searchwords.length<20 then
+				searchwords.map! { |e| "(dentries.dialoguetext LIKE '%#{e}%')"}
+				boolop = some ? " or " : " and "
+				query+="WHERE (#{searchwords.join(boolop)})"
 			else
-				searchwords=searchQ.split(" ")
-				searchwords.reject!{|e| e.length<3}
-				if searchwords.length>0 and searchwords.length<20 then
-					searchwords.map! { |e| "(dentries.dialoguetext LIKE '%#{e}%')"}
-					boolop = some ? " or " : " and "
-					query+="WHERE (#{searchwords.join(boolop)})"
-				else
-					query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
-				end
+				query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
 			end
+		end
 
-			if actorlimit.to_i>0
-				query+=" and actor='#{actorlimit.to_i}'"
-			end
+		if actorlimit.to_i>0
+			query+=" and actor='#{actorlimit.to_i}'"
 		end
 		if maxsearch>0
 			query+="limit #{maxsearch}"
