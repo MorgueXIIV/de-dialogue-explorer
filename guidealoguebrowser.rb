@@ -203,7 +203,7 @@ class DialogueEntry
 		end
 	end
 
-	def to_s(lomg=false, markdown=false,check=false,altshow=true)
+	def to_s(lomg=false, markdown=false,check=false,altshow=false)
 		if markdown then
 			ital = "*"
 			bold = "**"
@@ -358,48 +358,6 @@ class DialogueExplorer
 		end
 	end
 
-	def choiceprocess()
-		if (optionsAvail?)
-			puts "choose a number: ".light_red
-			@nowOptions.each_with_index { |dia, i| puts "#{i+1}: ".light_red.underline + dia.to_s(true) } 
-			puts "Or change to:"
-		end
-
-		if lineSelected?()
-			puts " (n)ext lines, (p)revious lines, \n view (c)onversation info, (d)ump entire conversation,".light_red
-		end
-		puts  "(s)earch for a new line (q)uit (d)ump based on ID".light_red
-		choice = gets.chomp
-		case choice
-		when "q"
-			# self.output
-		when "n"
-			self.nextlines
-		when "p"
-			self.prevlines
-		when "c"
-			self.conversationinfo
-		when "d"
-			self.dialoguedump
-		when "s"
-			self.searchlines
-			choiceprocess
-		else
-			optionnum=(choice.to_i)-1
-			if optionsAvail? then
-				if @nowOptions[optionnum].nil? then
-					"option selected out of range, try again"
-					choiceprocess()
-				else
-					@nowLine=@nowOptions[optionnum]
-					@nowOptions=[]
-					choiceprocess
-				end
-			end
-		end
-		return optionnum
-	end
-
 	def lineFromArray(arrayOfInfo, lomg, markdown)
 		if markdown then
 			italic="*"
@@ -503,15 +461,14 @@ class DialogueExplorer
 		maxsearch=0
 		#us SQL query to get the line IDs when they partial match the provided input string.
 		if searchQ.strip.length==0 then
-			query="SELECT conversationid,id FROM dentries"
-			query+="and actor='#{actorlimit.to_i}'"
+			query="SELECT conversationid,id FROM dentries where actor='#{actorlimit.to_i}'"
 		else
 			if byphrase then
 				query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
 			else
 				searchwords=searchQ.split(" ")
+				searchwords.reject!{|e| e.length<3}
 				if searchwords.length>0 and searchwords.length<20 then
-					searchwords.reject!{|e| e.length<3}
 					query="SELECT conversationid,id FROM dentries WHERE "
 					searchwords.map! { |e| "(dentries.dialoguetext LIKE'%#{e}%')"}
 					boolop = some ? " or " : " and "
@@ -660,28 +617,33 @@ class GUIllaume
 
 		@note.grid(:row=>0,:column=>0,:sticky => 'news')
 
+		TkLabel.new("text"=>$VersionNumber).grid(:row=>10,:column=>0,:sticky => 'news')
+
 		@searchEntry = TkFrame.new(@page1).grid(:sticky => 'new')
-
-		ph = { 'padx' => 10, 'pady' => 10 } 
-
 
 		TkGrid.columnconfigure @root, 0, :weight => 1
 		TkGrid.rowconfigure @root, 0, :weight => 1
+		buildSearcherPage
+		buildBrowserPage
+		buildDumpPage
+		buildConfigPage
+	end
 
+	def buildSearcherPage()
 		@searchStr = TkVariable.new;
 		@searchStr.value="tiptop"
-		TkLabel.new(@searchEntry) {text 'search for:'}.grid( :column => 1, :row => 1, :sticky => 'w')
+		TkLabel.new(@searchEntry) {text 'Search dialogue text for:'; font "TkHeadingFont"}.grid( :column => 1, :columnspan =>2,:row => 1, :sticky => 'w')
 
 		searchtextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @searchStr).grid( :column => 1, :row => 2, :columnspan=>2, :sticky => 'wnes' )
 		sear= proc {makeSearchResults}
-		searchtextbox.bind('Return', proc {makeSearchResults})
-		TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 3, :row => 2, :sticky => 'w')
+		searchtextbox.bind('Return', sear)
+		TkButton.new(@searchEntry, "text"=> 'search', "command"=> sear).grid( :column => 4, :row => 2, :rowspan => 2, :sticky => 'sewn')
 
 		@actorStr = TkVariable.new;
 		@actorStr.value=""
-		TkLabel.new(@searchEntry) {text 'only said by:'}.grid( :column => 4, :row => 1, :sticky => 'w')
+		TkLabel.new(@searchEntry) {text 'only said by:'}.grid( :column => 1, :row => 3, :sticky => 'w')
 		@searchnametextbox=TkEntry.new(@searchEntry, 'width'=> 30, 'textvariable' => @actorStr)
-		@searchnametextbox.grid( :column =>4, :columnspan=>2, :row => 2, :sticky => 'we' )
+		@searchnametextbox.grid( :column =>2, :columnspan=>1, :row => 3, :sticky => 'we' )
 		actorfind= proc{getNames}
 		actorfinde= proc{getNames(true)}
 		actorlose= proc{ungetNames}
@@ -689,15 +651,15 @@ class GUIllaume
 		@searchnametextbox.bind('Key', actorfind)
 		@searchnametextbox.bind('Return', actorfinde)
 		@searchnametextbox.bind('FocusOut', actorfinde)
-		@actorClear=TkButton.new(@searchEntry, "text"=> "Any Actor", "command"=> actorlose, "state"=>'disabled').grid( :column => 5, :row => 3, :sticky => 'sewn')
+		@actorClear=TkButton.new(@searchEntry, "text"=> "Any Actor", "command"=> actorlose, "state"=>'disabled').grid( :column => 3, :row => 3, :sticky => 'sewn')
 
-		@actorDump=TkButton.new(@searchEntry, "text"=> 'Actor Dump', "command"=> actordump, "state"=>"disabled").grid( :column => 5, :row => 4, :sticky => 'sewn')
+		@actorDump=TkButton.new(@searchEntry, "text"=> 'Actor Dump', "command"=> actordump, "state"=>"disabled").grid( :column => 4, :row => 4, :sticky => 'new')
 
 		@searchstyle = TkVariable.new
 		@searchstyle.value="all"
-		TkRadioButton.new(@searchEntry, "text" => 'exact phrase', "variable" => @searchstyle, "value" => 'phrase').grid( :column => 1, :row => 3, :sticky=>"e")
-		TkRadioButton.new(@searchEntry, "text" => 'all words', "variable" => @searchstyle, "value" => 'all').grid( :column => 2, :row => 3, :sticky=>"ew")
-		TkRadioButton.new(@searchEntry, "text" => 'any words', "variable" => @searchstyle, "value" => 'any').grid( :column => 3, :row => 3, :sticky=>"w")
+		TkRadioButton.new(@searchEntry, "text" => 'exact phrase', "variable" => @searchstyle, "value" => 'phrase').grid( :column => 2, :row => 1, :sticky=>"e")
+		TkRadioButton.new(@searchEntry, "text" => 'all words', "variable" => @searchstyle, "value" => 'all').grid( :column => 3, :row => 1, :sticky=>"we")
+		TkRadioButton.new(@searchEntry, "text" => 'any words', "variable" => @searchstyle, "value" => 'any').grid( :column => 4, :row => 1, :sticky=>"w")
 		# TkRadioButton.new(@searchEntry, "text" => 'all by Actor:', "variable" => @searchstyle, "value" => 'person', "state"=>"disabled").grid( :column => 3, :row => 3, :sticky=>"w")
 
 
@@ -705,28 +667,25 @@ class GUIllaume
 		@selectedLine = TkVariable.new
 		@resultsCount = TkVariable.new
 		@selectedLine.value="Select a Line To View More Details Here"
-		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>600, "height"=>5).grid( :column => 1, :columnspan=>5, :row => 5, :sticky=>"nsew");
+		TkLabel.new(@searchEntry, "textvariable" => @selectedLine,"wraplength"=>450, "height"=>5).grid( :column => 1, :columnspan=>3, :row => 5, :sticky=>"nsew");
 
-		TkGrid.columnconfigure @searchEntry, 1,:weight => 1
-		TkGrid.rowconfigure @searchEntry, 4, :weight => 1
+		TkGrid.columnconfigure @searchEntry, 2,:weight => 1
+		TkGrid.rowconfigure @searchEntry, 5, :weight => 1
 
-
-
-		TkLabel.new(@searchEntry) {text 'found;'}.grid( :column => 1, :row => 4, :sticky => 'e')
-		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 2, :row => 4, :sticky => 'e');
-		TkLabel.new(@searchEntry) {text 'Dialogue Lines'}.grid( :column => 3, :row => 4, :sticky => 'w')
+		TkLabel.new(@searchEntry, "textvariable" => @resultsCount).grid( :column => 1, :columnspan=>2, :row => 4, :sticky => 'e');
+		# TkLabel.new(@searchEntry) {text 'Dialogue Lines'}.grid( :column => 3, :row => 4, :sticky => 'w')
 
 		@resultsBox = TkFrame.new(@page1).grid(:column=>0,:row=>5,:sticky => 'sewn')
 		TkGrid.columnconfigure @page1, 0, :weight => 1
 		TkGrid.rowconfigure @page1, 5, :weight => 2
 
 		TkGrid.columnconfigure @resultsBox, 1, :weight => 1
-		TkGrid.rowconfigure @resultsBox, 1, :weight => 1
+		TkGrid.rowconfigure @resultsBox, 5, :weight => 1
 
 		begintrace=proc{traceLine}
-		@traceButton = TkButton.new(@resultsBox, "text"=> 'trace line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>300).grid( :column => 1, :row => 4, :sticky => 'we')
+		@traceButton = TkButton.new(@resultsBox, "text"=> 'trace line ', "command"=> begintrace, "state"=>"disabled", "wraplength"=>300).grid( :column => 1, :row => 1, :sticky => 'we')
 		begindump=proc{dumpLine}
-		@dumpButton = TkButton.new(@resultsBox, "text"=> 'dump conversation ', "command"=> begindump, "state"=>"disabled", "wraplength"=>300).grid( :column => 1, :row => 5, :sticky => 'we')
+		@dumpButton = TkButton.new(@resultsBox, "text"=> 'dump conversation ', "command"=> begindump, "state"=>"disabled", "wraplength"=>300).grid( :column => 1, :row => 2, :sticky => 'we')
 
 		sel= proc{lineSelect}
 		@searchlistbox = TkListbox.new(@resultsBox) do
@@ -738,7 +697,7 @@ class GUIllaume
 			state "disabled"
 			# pack('fill' => 'x')
 		end
-		@searchlistbox.grid(:column=>1, :row => 1, :sticky => "sewn")
+		@searchlistbox.grid(:column=>1, :row => 5, :sticky => "sewn")
 
 		@searchlistbox.bind('ButtonRelease-1', sel)
 		@searchlistbox.bind('Return', sel)
@@ -747,7 +706,7 @@ class GUIllaume
 		scroll = TkScrollbar.new(@resultsBox) do
 		   orient 'vertical'
 		end
-		scroll.grid(:column=>2, :row => 1, :sticky => "ns")
+		scroll.grid(:column=>2, :row => 5, :sticky => "ns")
 
 		@searchlistbox.yscrollcommand(proc { |*args|
 		   scroll.set(*args)
@@ -760,7 +719,7 @@ class GUIllaume
 		scrollx = TkScrollbar.new(@resultsBox) do
 		   orient 'horizontal'
 		end
-		scrollx.grid(:column=>1, :row => 2, :sticky => "ew")
+		scrollx.grid(:column=>1, :row => 6, :sticky => "ew")
 
 		@searchlistbox.xscrollcommand(proc { |*args|
 		   scrollx.set(*args)
@@ -769,6 +728,8 @@ class GUIllaume
 		scrollx.command(proc { |*args|
 		   @searchlistbox.xview(*args)
 		}) 
+	end
+	def buildBrowserPage()
 
 		# PAGE 2:
 
@@ -778,7 +739,7 @@ class GUIllaume
 		@underButtonFrame = TkFrame.new(@page2)
 		@underButtonFrame.grid(:column=>3,:row=>5, :sticky=>"sewn" )
 
-		@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 2; wrap "word"}
+		@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 2; wrap "word"; background "grey"}
 		@forwButtonArea.grid(:column => 0, :row => 1, :sticky => 'nwes')
 		TkGrid.columnconfigure(@underButtonFrame, 0, :weight => 1)
 		TkGrid.rowconfigure @underButtonFrame, 1, :weight => 1
@@ -792,7 +753,7 @@ class GUIllaume
 		@overButtonFrame = TkFrame.new(@page2)
 		@overButtonFrame.grid(:column=>3,:row=>1, :sticky=>"sewn" )
 
-		@backButtonArea = TkText.new(@overButtonFrame) {width 40; height 2; wrap "word"}
+		@backButtonArea = TkText.new(@overButtonFrame) {width 40; height 2; wrap "word"; background "grey"}
 		@backButtonArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
 		TkGrid.columnconfigure(@overButtonFrame, 0, :weight => 1)
 		TkGrid.rowconfigure @overButtonFrame, 0, :weight => 1
@@ -809,7 +770,8 @@ class GUIllaume
 		TkGrid.rowconfigure @page2, 1, :weight => 1
 		TkGrid.rowconfigure @page2, 5, :weight => 1
 
-		upda=proc{updateConversation}
+		@upda=proc{updateConversation}
+		@updas=proc{updateConversation(true)}
 
 		@convoArea = TkText.new(@convoDisplayArea) {width 40; height 10; wrap "word"}
 		@convoArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
@@ -823,16 +785,10 @@ class GUIllaume
 		ys.command proc{|*args| @convoArea.yview(*args);}
 		@convoArea.insert('end', "Conversation Will Display Here When Tracing Begins ")
 
-		# xs = Tk::Tile::Scrollbar.new(@convoDisplayArea) {orient 'horizontal'; command proc{|*args| @convoArea.xview(*args);}}
-		# @convoArea['xscrollcommand'] = proc{|*args| xs.set(*args);}
-		# xs.grid( :column => 0, :row => 1, :sticky => 'we')
-
-		# TkGrid.columnconfigure(@convoDisplayArea, 2, :weight => 1)
 		TkGrid.rowconfigure(@page2, 3, :weight => 1)
+	end
 
-
-
-
+	def buildDumpPage()
 		# PAGE 3:
 		@convoDesc=TkVariable.new()
 
@@ -857,10 +813,10 @@ class GUIllaume
 		selectall=proc{@dumpTextBox.tag_add('sel', 1.0, 'end');@dumpTextBox.mark_set("insert","end");@dumpTextBox.see("end")}
 		TkButton.new(@dumpDisplayArea, "text"=> 'Select All Text', "command"=> selectall).grid( :column => 0, :row => 5, :sticky => 'sewn')
 		TkLabel.new(@dumpDisplayArea, "text" => "Apologies, for performance reasons, these dumps do not show red checks or alternate lines, these can only be viewed in the conversation browser.","wraplength"=>500).grid( :column => 0, :row => 10, :sticky => 'ew');
+	end
 
-
+	def buildConfigPage()
 		# PAGELAST
-
 		@browseDisplayOptions = TkFrame.new(@pageLAST)
 		@browseDisplayOptions.grid(:column=>3, :row=>0, :sticky=>"sewn" )
 
@@ -869,7 +825,7 @@ class GUIllaume
 		@browserMarkdown.value = true
 		browsemarkcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show markdown tags?',
-	    	"command" =>upda,
+	    	"command" =>@updas,
 	    	"variable" =>@browserMarkdown,
 	    	"onvalue" => true, 
 	    	"offvalue" => false)
@@ -879,7 +835,7 @@ class GUIllaume
 		@browserHubs.value = false 
 	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show hubs?',
-	    	"command" =>upda,
+	    	"command" =>@upda,
 	    	"variable" =>@browserHubs,
 	    	"onvalue" => true, 
 	    	"offvalue" => false)
@@ -889,7 +845,7 @@ class GUIllaume
 		@browserShowMore.value = true
 	    browselomgcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show details?',
-	    	"command" =>upda,
+	    	"command" =>@upda,
 	    	"variable" =>@browserShowMore,
 	    	"onvalue" => true, 
 	    	"offvalue" => false)
@@ -899,21 +855,38 @@ class GUIllaume
 		@browserShowAlts.value = true
 	    browsealtscheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show alternate lines?',
-	    	"command" =>upda,
+	    	"command" =>@upda,
 	    	"variable" =>@browserShowAlts,
 	    	"onvalue" => true, 
 	    	"offvalue" => false)
 	    browsealtscheckbox.grid(:row=>4, :column=>5,:sticky => 'w')
 
+
+	    @browserHightlightLines = TkVariable.new
+		@browserHightlightLines.value = true
+	    browsehlcheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'highlight new lines?',
+	    	"variable" =>@browserHightlightLines,
+	    	"onvalue" => true, 
+	    	"offvalue" => false)
+	    browsehlcheckbox.grid(:row=>5, :column=>5,:sticky => 'w')
+
 	    @fontOption = TkVariable.new
-		@fontOption.value="courier 12"
-		@dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
+		@fontOption.value="courier 13"
+
+		loadConfigs
+
+		@dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value, "background"=>@highlightColour).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
 		fontprev=proc{@dispoptions['font'] = @fontOption.value}
+
+		# Deprecated Font Settngs
+
 		# TkRadioButton.new(@browseDisplayOptions, "text" => 'monospace', "variable" => @fontOption, "value" => 'courier 12',"command"=>fontprev).grid( :column => 3, :row => 1, :sticky=>"e")
 		# TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times 12',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
 		# TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica 12',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
 
 		TkButton.new(@browseDisplayOptions, "text"=> 'SAVE CONFIGS TO DB', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 10, :sticky => 'sewn')
+		TkButton.new(@browseDisplayOptions, "text"=> 'FORGET CONFIGS FROM DB', "command"=> proc{loseConfigs}).grid( :column => 3, :row => 11, :sticky => 'sewn')
 
 		TkFont::Fontchooser.configure :font => "courier 12", :command => proc{|f| font_changed(f);}
 
@@ -921,10 +894,12 @@ class GUIllaume
 
 		TkButton.new(@browseDisplayOptions, "text"=> 'Font Options', "command"=> fontget).grid( :column => 3, :row => 2, :sticky => 'sewn')
 
+		colget=proc{@highlightColour=Tk::chooseColor :initialcolor => @highlightColour;@dispoptions.background=@highlightColour}
+		TkButton.new(@browseDisplayOptions, "text"=> 'Highlight Colour:', "command"=> colget).grid( :column => 3, :row => 4, :sticky => 'sewn')
+
+
+
 		# TkFont::Fontchooser.hide
-
-		loadConfigs
-
 	end
 
 
@@ -953,24 +928,25 @@ class GUIllaume
 
 	def getNames(complete=false)
 		if @actorStr.value.chomp(' ').length>1
-			actormatches = $db.execute("Select name,id from actors where name like '%#{@actorStr.value}%'")
-			if actormatches.length==1
+
+			# actormatches = $db.execute("Select name,id from actors where name like '%#{@actorStr.value}%'")
+			if @actorList.nil?
+				@actorList=$db.execute("Select name,id from actors order by talkativeness desc")
+			end
+			actorstrcase=@actorStr.value.downcase
+			actormatches = @actorList.select{|e| e[0].downcase.include?(actorstrcase)}
+			if actormatches.length==0 then
+				@searchnametextbox.background="red"
+				return nil
+			else
+				@searchnametextbox.background="white"
+			end
+			if actormatches.length==1 or complete then
 				@actorStr.value=actormatches[0][0]
 				@searchnametextbox.state="disabled"
 				@actorlimit=actormatches[0][1]
 				@actorClear.state="normal"
 				@actorDump.state="normal"
-			end
-			if complete
-				actormatches.each do |result|
-					if @actorStr.value.chomp.casecmp(result[0])==0 then
-						@actorStr.value=result[0]
-						@searchnametextbox.state="disabled"
-						@actorlimit=result[1]
-						@actorClear.state="normal"
-						@actorDump.state="normal"
-					end
-				end
 			end
 		end
 	end
@@ -985,20 +961,27 @@ class GUIllaume
 
 	def saveConfigs()
 		$db.execute "CREATE TABLE IF NOT EXISTS meta (tuple TEXT, value TEXT)"
-		$db.execute "delete from meta where tuple='font';"
-		$db.execute "delete from meta where tuple='markdown';"
-		$db.execute "delete from meta where tuple='hubsshow';"
-		$db.execute "delete from meta where tuple='detailshow';"
-		$db.execute "delete from meta where tuple='altsshow';"
+		loseConfigs
 
 		$db.execute "insert into meta(tuple,value) values ('font','#{@fontOption.value}');"
 		$db.execute "insert into meta(tuple,value) values ('markdown','#{@browserMarkdown.value}');"
 		$db.execute "insert into meta(tuple,value) values ('hubsshow','#{@browserHubs.value}');"
 		$db.execute "insert into meta(tuple,value) values ('detailshow','#{@browserShowMore.value}');"
 		$db.execute "insert into meta(tuple,value) values ('altsshow','#{@browserShowAlts.value}');"
+		$db.execute "insert into meta(tuple,value) values ('hlcolour','#{@highlightColour}');"
+	end
+
+	def loseConfigs()
+		$db.execute "delete from meta where tuple='font';"
+		$db.execute "delete from meta where tuple='markdown';"
+		$db.execute "delete from meta where tuple='hubsshow';"
+		$db.execute "delete from meta where tuple='detailshow';"
+		$db.execute "delete from meta where tuple='altsshow';"
+		$db.execute "delete from meta where tuple='hlcolour';"
 	end
 
 	def loadConfigs()
+		@highlightColour='#eefff0'
 		configs=$db.execute "select tuple,value from meta;"
 		configs.each do |config|
 			case config[0]
@@ -1012,8 +995,24 @@ class GUIllaume
 				@browserShowMore.value=config[1]
 			when 'altsshow'
 				@browserShowAlts.value=config[1]
+			when 'hlcolour'
+				@highlightColour=config[1]
 			end
 		end
+	end
+
+	def overwriteTextHighlightNew(areatoprint, texttoprint)
+		oldt= areatoprint.get("1.0", 'end')
+		printText(areatoprint,texttoprint)
+		oldt=oldt.split("\n")
+		newt=texttoprint.split("\n")
+		additions=newt-oldt
+		newt.each_with_index do |line, i|
+			if oldt.index(line).nil? then
+				areatoprint.tag_add("newLineHighlight", "#{i+1}.0", "#{i+1}.end")
+			end
+		end
+		areatoprint.tag_configure('newLineHighlight', :background=>@highlightColour)
 	end
 
 	def printText(areatoprint, texttoprint)
@@ -1029,6 +1028,9 @@ class GUIllaume
 			italdelim=""
 			bolddelim=""
 		end
+
+		areatoprint.delete(1.0, 'end')
+
 		convoarr=texttoprint.split("\n")
 		convoarr.each do |line|
 			boldies=line.split("\*\*")
@@ -1051,14 +1053,16 @@ class GUIllaume
 	end
 
 
-	def updateConversation()
+	def updateConversation(overridehighlight=false)
 		@convoArea['state'] = :normal
-
-		@convoArea.delete(1.0, 'end')
 
 		convo=@explorer.outputLineCollectionStr(@browserShowMore>0,@browserHubs<1,@browserMarkdown>0,true,@browserShowAlts>0)
 
-		printText(@convoArea,convo)
+		if @browserHightlightLines>0 and not(overridehighlight) then
+			overwriteTextHighlightNew(@convoArea,convo)
+		else
+			printText(@convoArea,convo)
+		end
 	end
 
 	def dumpLine()
@@ -1151,7 +1155,6 @@ class GUIllaume
 		when "phrase"
 			@searchByPhrase=true
 			@searchAnyWord=false
-
 		when "all"
 			@searchByPhrase=false
 			@searchAnyWord=false
@@ -1164,7 +1167,7 @@ class GUIllaume
 		end
 
 		@lineSearch=@explorer.searchlines(searchStr,@actorlimit,@searchByPhrase, @searchAnyWord)
-		@resultsCount.value=@lineSearch.length
+		@resultsCount.value="Found: #{@lineSearch.length} results:"
 		itemsinbox=@searchlistbox.size
 
 		if itemsinbox>0 then
@@ -1179,6 +1182,7 @@ end
 begin
 	# opens a DB file to search
 	$db = SQLite3::Database.open 'test.db'
+	$VersionNumber="FAY-DE Playback Experiment - Version 0.21.02.13"
     GUIllaume.new()
 	
 	Tk.mainloop
