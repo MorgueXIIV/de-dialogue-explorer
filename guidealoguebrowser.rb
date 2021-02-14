@@ -314,13 +314,16 @@ class DialogueExplorer
 	end
 
 	def getSearchOptStrs(lomg=false)
-		# @searchOptions.flatten!
-		countOpts=@searchOptions.length
-		if countOpts>0 then
-			optStrs=Array.new(countOpts) { |i| @searchOptions[i].to_s }
-		else
-			optStrs=[]
-		end
+		optStrs=@searchOptions.map { |e| e[3].length>3 ? "#{e[2]}: #{e[3]}" : e[4] }
+		# # @searchOptions.flatten!
+		# countOpts=@searchOptions.length
+		# if countOpts>0 then
+
+		# 	optStrs=Array.new(countOpts) { |i| @searchOptions[i].to_s }
+		# else
+		# 	optStrs=[]
+		# end
+		puts optStrs.to_s
 		return optStrs
 	end
 
@@ -460,37 +463,47 @@ class DialogueExplorer
 		searchQ.gsub!('"', "_")
 		maxsearch=0
 		#us SQL query to get the line IDs when they partial match the provided input string.
-		if searchQ.strip.length==0 then
-			query="SELECT conversationid,id FROM dentries where actor='#{actorlimit.to_i}'"
-		else
-			if byphrase then
-				query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+		#dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.hascheck, dentries.hasalts 
+
+
+		# 
+		# 	query="SELECT conversationid,id FROM dentries where actor='#{actorlimit.to_i}'"
+
+		query= "SELECT dentries.conversationid,dentries.id,actors.name, dentries.dialoguetext, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id "
+			if if searchQ.strip.length==0 then
+				query+= " where actor='#{actorlimit.to_i}'"
+			elsif byphrase then
+				query= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
 			else
 				searchwords=searchQ.split(" ")
 				searchwords.reject!{|e| e.length<3}
 				if searchwords.length>0 and searchwords.length<20 then
-					query="SELECT conversationid,id FROM dentries WHERE "
-					searchwords.map! { |e| "(dentries.dialoguetext LIKE'%#{e}%')"}
+					searchwords.map! { |e| "(dentries.dialoguetext LIKE '%#{e}%')"}
 					boolop = some ? " or " : " and "
-					query.concat(searchwords.join(boolop))
+					query+="WHERE (#{searchwords.join(boolop)})"
 				else
-					query= "SELECT conversationid,id FROM dentries WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+					query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
 				end
 			end
 
 			if actorlimit.to_i>0
-				query+="and actor='#{actorlimit.to_i}'"
+				query+=" and actor='#{actorlimit.to_i}'"
 			end
 		end
-		if maxsearch<0
+		if maxsearch>0
 			query+="limit #{maxsearch}"
 		end
+		puts query
 		searchDias=$db.execute query
-		#iterates over array of results, getting objects based on their id
-		@searchOptions=[]
-		searchDias.each do |dia|
-			@searchOptions.push(DialogueEntry.new(dia[0],dia[1]))
-		end
+
+		@searchOptions=searchDias
+
+		# #iterates over array of results, getting objects based on their id
+		# @searchOptions=[]
+		# searchDias.each do |dia|
+		# 	@searchOptions.push(DialogueEntry.new(dia[0],dia[1]))
+		# end
+
 		optionsStrs=getSearchOptStrs
 		return optionsStrs
 	end
@@ -500,10 +513,11 @@ class DialogueExplorer
 		if selOpt.nil?
 			return false
 		else
+			@nowLine=DialogueEntry.new(selOpt[0],selOpt[1])
 			@lineCollection=[]
-			@lineCollection.push(selOpt)
+			@lineCollection.push(@nowLine)
 		end
-		return selOpt.to_s(true)
+		return @nowLine.to_s(true)
 	end
 
 	def selectForwTraceOpt(optToSelect)
