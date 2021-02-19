@@ -23,7 +23,7 @@ def getCLAttribute(convoOrLine, attributeToGrab)
 		if convoOrLine["fields"].has_key?(attributeToGrab) then
 			return convoOrLine["fields"][attributeToGrab];
 		else
-			return "fieldshashnokey";
+			return 0;
 		end
 	elsif convoOrLine["fields"].is_a?(Array) 
 		convoOrLine["fields"].each do |fieldobj|
@@ -34,7 +34,7 @@ def getCLAttribute(convoOrLine, attributeToGrab)
 			end
 		end
 	else 
-		return "fieldsnothashorarray"
+		return 0
 	end
 	return 0
 end
@@ -117,16 +117,6 @@ def getArrayForDB(hashToInspect, arrayOfAttributes)
 	return arrayOfData;
 end
 
-
-#reads in and parses the JSON
-#TEST NEW ERROR HANDLING PLS
-begin
-	starttime=Time.now()
-
-	# json= File.read('Disco Elysium Cut.json');
-	json= File.read('Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json');
-	dealogues=JSON.parse(json);
-
 	$articyIDskills=Hash["0x0100000400000918"=>"Conceptualization",
 	"0x0100000400000767"=>"Logic",
 	"0x010000040000076B"=>"Encyclopedia",
@@ -160,11 +150,27 @@ begin
 	"0x0100005200000009"=>"Intellect",
 	"0x010000520000000D"=>"Fysique",]
 
-  	version = dealogues['version']
-	# opens a DB file, Creates our database tables
-	versioname=version.gsub(/[\/ :]/,"-")
-	puts "creating: discobase#{versioname}.db"
-	db = SQLite3::Database.open "discobase#{versioname}.db"
+#reads in and parses the JSON
+#TEST NEW ERROR HANDLING PLS
+begin
+	starttime=Time.now()
+
+	creategoodnamedDB=false
+	useJSON='Disco Elysium Cut.json'
+	# useJSON='Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json'
+
+	json= File.read(useJSON);
+	dealogues=JSON.parse(json);
+
+	if creategoodnamedDB then
+	  	version = dealogues['version']
+		# opens a DB file, Creates our database tables
+		versioname=version.gsub(/[\/ :]/,"-")
+		puts "creating: discobase#{versioname}.db"
+		db = SQLite3::Database.open "discobase#{versioname}.db"
+	else
+		db = SQLite3::Database.open "test.db"
+	end
 
 	db.execute """CREATE TABLE IF NOT EXISTS dialogues
 	(id INT PRIMARY KEY, title TEXT, description TEXT, actor INT, conversant INT)""";
@@ -211,6 +217,12 @@ begin
 	condition TEXT, alternateline TEXT,
   	FOREIGN KEY (conversationid,dialogueid) REFERENCES dentries(conversationid, id))""";
 
+  	#databse table for variables
+
+  	db.execute """CREATE TABLE IF NOT EXISTS variables
+	(id INT PRIMARY KEY, name TEXT, 
+	initialvalue TEXT, description TEXT)""";
+
 
 
   	# version = dealogues['version']
@@ -234,10 +246,11 @@ begin
 	doDialogues=false
 	doDentries=false
 	doDlinks=false
-	doChecks=true
-	doModifiers=true
-	doActorTalkativeness=true
-	doAlternateLines=true
+	doChecks=false
+	doModifiers=false
+	doActorTalkativeness=false
+	doAlternateLines=false
+	doVariables=true
 
 	#inistialise counter
 	numberOfdbEntriesMade=0;
@@ -248,6 +261,7 @@ begin
 
 	#Loop over the actors array, create a hash of relevant attributes (concatenate descriptions), stick them in the database
 	if doActors then
+		puts "Doing that 'Actors' table:"
 		for thisActor in dealogues["actors"] do
 			actorAtts=[getCLAttribute(thisActor,"id"),getCLAttribute(thisActor,"Name")];
 			aDescription = getCLAttribute(thisActor,"Description").to_s + ":";
@@ -261,79 +275,101 @@ begin
 		# add the HUB actor
 		db.execute "INSERT INTO actors (id, name, description) values (?,?,?)", [0,"HUB", "null actor added to allow inner joins"];
 		numberOfdbEntriesMade+=1;
+		puts "actors complete with #{numberOfdbEntriesMade} records so far"
 	end
-
-
-	#loop over the conversations and enter them into the database
-	for thisConvo in dealogues["conversations"] do
-		if doDialogues then
-			conversationAtts=[]
-			conversationAtts=getArrayForDB(thisConvo,listOfConvoAtts);
-
-			db.execute "INSERT INTO dialogues (id, title, description, actor, conversant) VALUES (?,?,?,?,?)", conversationAtts;
+	if doVariables then
+		puts "Doing that 'variables' table:"
+		for thisVar in dealogues["variables"] do
+			varAtts=[getCLAttribute(thisVar,"id"), getCLAttribute(thisVar,"Name"),getCLAttribute(thisVar,"Description"), getCLAttribute(thisVar,"Initial Value")]
+			db.execute "INSERT INTO variables (id, name, description, initialvalue) values (?,?,?,?)", varAtts;
 			numberOfdbEntriesMade+=1;
 		end
-		
-		#SUB LOOP; for every conversation we also need to enter the many sub-lines of that conversation
-		for thisLine in thisConvo["dialogueEntries"] do
-			checkData=getIsCheckAttributes(thisLine)
-			altData=getLineAlternatesArrays(thisLine)
-			if doDentries then
-				lineAtts=[]
-				lineAtts=getArrayForDB(thisLine,listOfLineAtts);
+		puts "variables complete with #{numberOfdbEntriesMade} records so far"
+	end
 
-				if checkData then
-					lineAtts.push(1)
-				else
-					lineAtts.push(0)
-				end
+	if (doDialogues or doAlternateLines or doChecks or doDentries or doDlinks) then
+		# shockingly complex routine to tell terminal what we're doing
+		listofthingstodothisloop=hash["dialogues" => doDialogues, "dentries" => doDentries, "dialogue links" => doDlinks, "dialogue active checks" =>doChecks, "alternate dialogue lines" => doAlternateLines]
+		listofthingstodothisloop.select!{|k,v| v }
+		if listofthingstodothisloop.empty? then
+			listofthingstodothisloop= "THIS SHOULD NEVER RUN ACTUALLY"
+		else 
+			listofthingstodothisloop=listofthingstodothisloop.keys.join(", ")
+			listofthingstodothisloop += " (this is the BIG DATASET, pls be patient)"
+		end
 
-				if not altData.empty? then
-					lineAtts.push(1)
-				else
-					lineAtts.push(0)
-				end
+		puts "adding #{listofthingstodothisloop} to the database "
+		#loop over the conversations and enter them into the database
+		for thisConvo in dealogues["conversations"] do
+			if doDialogues then
+				conversationAtts=[]
+				conversationAtts=getArrayForDB(thisConvo,listOfConvoAtts);
 
-				db.execute "INSERT INTO dentries (id, title, dialoguetext, sequence, actor, conversant, conversationid,difficultypass,isgroup,conditionstring,userscript,hascheck,hasalts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", lineAtts;
+				db.execute "INSERT INTO dialogues (id, title, description, actor, conversant) VALUES (?,?,?,?,?)", conversationAtts;
 				numberOfdbEntriesMade+=1;
 			end
+			
+			#SUB LOOP; for every conversation we also need to enter the many sub-lines of that conversation
+			for thisLine in thisConvo["dialogueEntries"] do
+				checkData=getIsCheckAttributes(thisLine)
+				altData=getLineAlternatesArrays(thisLine)
+				if doDentries then
+					lineAtts=[]
+					lineAtts=getArrayForDB(thisLine,listOfLineAtts);
 
-			# insert checks and modifiers if the line has a check
-			if checkData then
-				if doChecks
-					db.execute "INSERT INTO checks (conversationid, dialogueid, isred, difficulty, flagname, forced, skilltype) VALUES (?,?,?,?,?,?,?)", checkData;
+					if checkData then
+						lineAtts.push(1)
+					else
+						lineAtts.push(0)
+					end
+
+					if not altData.empty? then
+						lineAtts.push(1)
+					else
+						lineAtts.push(0)
+					end
+
+					db.execute "INSERT INTO dentries (id, title, dialoguetext, sequence, actor, conversant, conversationid,difficultypass,isgroup,conditionstring,userscript,hascheck,hasalts) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", lineAtts;
 					numberOfdbEntriesMade+=1;
 				end
-				if doModifiers
-					modifiers=getCheckModifiersArrays(thisLine);
-					if !(modifiers.nil? or modifiers.empty?) then
-						modifiers.each do |mod| 
-							db.execute "INSERT INTO modifiers (conversationid, dialogueid, variable,modifier, tooltip) VALUES (?,?,?,?,?)", mod;
-							numberOfdbEntriesMade+=1
+
+				# insert checks and modifiers if the line has a check
+				if checkData then
+					if doChecks
+						db.execute "INSERT INTO checks (conversationid, dialogueid, isred, difficulty, flagname, forced, skilltype) VALUES (?,?,?,?,?,?,?)", checkData;
+						numberOfdbEntriesMade+=1;
+					end
+					if doModifiers
+						modifiers=getCheckModifiersArrays(thisLine);
+						if !(modifiers.nil? or modifiers.empty?) then
+							modifiers.each do |mod| 
+								db.execute "INSERT INTO modifiers (conversationid, dialogueid, variable,modifier, tooltip) VALUES (?,?,?,?,?)", mod;
+								numberOfdbEntriesMade+=1
+							end
 						end
 					end
 				end
-			end
 
 
-			if doAlternateLines
-				if !(altData.nil? or altData.empty?) 
-					altData.each do |alt|
-						db.execute "INSERT INTO alternates (conversationid, dialogueid, condition, alternateline) VALUES (?,?,?,?)", alt;
-						numberOfdbEntriesMade+=1;
+				if doAlternateLines
+					if !(altData.nil? or altData.empty?) 
+						altData.each do |alt|
+							db.execute "INSERT INTO alternates (conversationid, dialogueid, condition, alternateline) VALUES (?,?,?,?)", alt;
+							numberOfdbEntriesMade+=1;
+						end
 					end
 				end
-			end
 
-			#add ANOTHER loop which enters any outgoing links to the links database IF they exist;
-			if doDlinks
-				if thisLine.has_key?("outgoingLinks") then
-					#linksdb loop
-					for thisLink in thisLine["outgoingLinks"] do
-						linkAtts=[] #create array
-						linkAtts=getArrayForDB(thisLink,listOfLinkAtts);
-						db.execute "INSERT INTO dlinks (originconversationid, origindialogueid, destinationconversationid, destinationdialogueid, isConnector, priority) VALUES (?,?,?,?,?,?)", linkAtts #SQL insert
-						numberOfdbEntriesMade+=1;
+				#add ANOTHER loop which enters any outgoing links to the links database IF they exist;
+				if doDlinks
+					if thisLine.has_key?("outgoingLinks") then
+						#linksdb loop
+						for thisLink in thisLine["outgoingLinks"] do
+							linkAtts=[] #create array
+							linkAtts=getArrayForDB(thisLink,listOfLinkAtts);
+							db.execute "INSERT INTO dlinks (originconversationid, origindialogueid, destinationconversationid, destinationdialogueid, isConnector, priority) VALUES (?,?,?,?,?,?)", linkAtts #SQL insert
+							numberOfdbEntriesMade+=1;
+						end
 					end
 				end
 			end
