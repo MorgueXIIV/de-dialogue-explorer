@@ -315,15 +315,6 @@ class DialogueExplorer
 
 	def getSearchOptStrs(lomg=false)
 		optStrs=@searchOptions.map { |e| e[3].length>3 ? "#{e[2]}: #{e[3]}" : e[4] }
-		# # @searchOptions.flatten!
-		# countOpts=@searchOptions.length
-		# if countOpts>0 then
-
-		# 	optStrs=Array.new(countOpts) { |i| @searchOptions[i].to_s }
-		# else
-		# 	optStrs=[]
-		# end
-		puts optStrs.to_s
 		return optStrs
 	end
 

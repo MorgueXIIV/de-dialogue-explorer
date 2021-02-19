@@ -15,17 +15,28 @@ def idConvoLine(idNumber, convo)
 end
 
 #this method gets a speficied attribute from a passed hash. 
-#Crucially, ti will get it if it's a direct part of the hash, OR if it's been embedded in the "fields" hash.
+#Crucially, ti will get it if it's a direct part of the hash, OR if it's been embedded in the "fields" hash, or if htat as is still an array... etc
 def getCLAttribute(convoOrLine, attributeToGrab)
 	if (convoOrLine.has_key?(attributeToGrab)) then
 		return convoOrLine[attributeToGrab];
-	else
+	elsif convoOrLine["fields"].is_a?(Hash) then
 		if convoOrLine["fields"].has_key?(attributeToGrab) then
 			return convoOrLine["fields"][attributeToGrab];
 		else
-			return 0;
+			return "fieldshashnokey";
 		end
+	elsif convoOrLine["fields"].is_a?(Array) 
+		convoOrLine["fields"].each do |fieldobj|
+			if fieldobj.has_key?(attributeToGrab) then
+				return fieldobj[attributeToGrab]
+			elsif fieldobj["title"]==attributeToGrab then
+                return fieldobj["value"]
+			end
+		end
+	else 
+		return "fieldsnothashorarray"
 	end
+	return 0
 end
 
 # returns false if line doesn't have a check, returns the check's attributes if if does
@@ -112,7 +123,8 @@ end
 begin
 	starttime=Time.now()
 
-	json= File.read('Disco Elysium Cut.json');
+	# json= File.read('Disco Elysium Cut.json');
+	json= File.read('Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json');
 	dealogues=JSON.parse(json);
 
 	$articyIDskills=Hash["0x0100000400000918"=>"Conceptualization",
@@ -148,9 +160,11 @@ begin
 	"0x0100005200000009"=>"Intellect",
 	"0x010000520000000D"=>"Fysique",]
 
-
-	# opens a DB file, Creates our database tables	
-	db = SQLite3::Database.open 'test.db'
+  	version = dealogues['version']
+	# opens a DB file, Creates our database tables
+	versioname=version.gsub(/[\/ :]/,"-")
+	puts "creating: discobase#{versioname}.db"
+	db = SQLite3::Database.open "discobase#{versioname}.db"
 
 	db.execute """CREATE TABLE IF NOT EXISTS dialogues
 	(id INT PRIMARY KEY, title TEXT, description TEXT, actor INT, conversant INT)""";
@@ -199,7 +213,7 @@ begin
 
 
 
-  	version = dealogues['version']
+  	# version = dealogues['version']
   	db.execute "CREATE TABLE IF NOT EXISTS meta (tuple TEXT, value TEXT)"
   	versionsindb=db.execute "SELECT * FROM meta WHERE tuple='version-date'"
   	versionsindb.flatten!
@@ -218,11 +232,11 @@ begin
 	# POPULATING CERTAIN TABLES
 	doActors=false
 	doDialogues=false
-	doDentries=true
+	doDentries=false
 	doDlinks=false
-	doChecks=false
-	doModifiers=false
-	doActorTalkativeness=false
+	doChecks=true
+	doModifiers=true
+	doActorTalkativeness=true
 	doAlternateLines=true
 
 	#inistialise counter
