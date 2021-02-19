@@ -422,7 +422,6 @@ class DialogueExplorer
 
 		dumpStr=""
 		searchDias=$db.execute "SELECT actors.name, dentries.dialoguetext, dentries.conditionstring, dentries.userscript, dentries.sequence, dentries.difficultypass, dentries.title, dentries.hascheck, dentries.hasalts FROM dentries INNER JOIN actors ON dentries.actor=actors.id WHERE dentries.actor='#{actorID}'"
-
 		searchDias.each do |line|
 			if not (removehubs and line[1].length<3) then
 				dumpStr+=lineFromArray(line,lomg,markdown)+"\n"
@@ -447,7 +446,7 @@ class DialogueExplorer
 		end
 	end 
 
-	def searchlines(searchQ=nil, actorlimit=0,byphrase=true, some=false)
+	def searchlines(searchQ=nil, actorlimit=0, searchStyle="all")
 
 		#  remove " and 's with GSUB"
 		searchQ.gsub!("'", "_")
@@ -458,14 +457,25 @@ class DialogueExplorer
 		query= "SELECT dentries.conversationid,dentries.id,actors.name, dentries.dialoguetext, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id "
 		if searchQ.strip.length==0 then
 			query+= " where actor='#{actorlimit.to_i}'"
-		elsif byphrase then
+		elsif searchStyle=="variable"
+			searchwords=searchQ.split(" ")
+			searchwords.reject!{|e| e.length<2}
+			if searchwords.length>0 and searchwords.length<5 then
+				searchwords.map! { |e| "(dentries.userscript LIKE '%#{e}%')"}
+				boolop = " and "
+				query+="WHERE (#{searchwords.join(boolop)})"
+				query+="OR (#{searchwords.join(boolop).gsub("userscript","conditionstring")})"
+			else
+				query+= " WHERE dentries.userscript LIKE '%#{searchQ.gsub(" ","%")}%' or dentries.conditionstring LIKE '%#{searchQ.gsub(" ","%")}%'"
+			end				
+		elsif searchStyle=="phrase" then
 			query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
 		else
 			searchwords=searchQ.split(" ")
 			searchwords.reject!{|e| e.length<3}
 			if searchwords.length>0 and searchwords.length<20 then
 				searchwords.map! { |e| "(dentries.dialoguetext LIKE '%#{e}%')"}
-				boolop = some ? " or " : " and "
+				boolop = searchStyle=="any" ? " or " : " and "
 				query+="WHERE (#{searchwords.join(boolop)})"
 			else
 				query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
@@ -618,7 +628,6 @@ class GUIllaume
 
 		TkLabel.new("text"=>$VersionNumber).grid(:row=>10,:column=>0,:sticky => 'news')
 
-		@searchEntry = TkFrame.new(@page1).grid(:sticky => 'new')
 
 		TkGrid.columnconfigure @root, 0, :weight => 1
 		TkGrid.rowconfigure @root, 0, :weight => 1
@@ -629,6 +638,8 @@ class GUIllaume
 	end
 
 	def buildSearcherPage()
+
+		@searchEntry = TkFrame.new(@page1).grid(:sticky => 'new')
 		@searchStr = TkVariable.new;
 		@searchStr.value="tiptop"
 		TkLabel.new(@searchEntry) {text 'Search dialogue text for:'; font "TkHeadingFont"}.grid( :column => 1, :columnspan =>2,:row => 1, :sticky => 'w')
@@ -651,17 +662,16 @@ class GUIllaume
 		@searchnametextbox.bind('Return', actorfinde)
 		@searchnametextbox.bind('FocusOut', actorfinde)
 		@actorClear=TkButton.new(@searchEntry, "text"=> "Any Actor", "command"=> actorlose, "state"=>'disabled').grid( :column => 3, :row => 3, :sticky => 'sewn')
-
 		@actorDump=TkButton.new(@searchEntry, "text"=> 'Actor Dump', "command"=> actordump, "state"=>"disabled").grid( :column => 4, :row => 4, :sticky => 'new')
 
+
+		searchstylebox=TkFrame.new(@searchEntry).grid(:row => 1, :column => 3, :columnspan => 2, :sticky=>"nw")
 		@searchstyle = TkVariable.new
 		@searchstyle.value="all"
-		TkRadioButton.new(@searchEntry, "text" => 'exact phrase', "variable" => @searchstyle, "value" => 'phrase').grid( :column => 2, :row => 1, :sticky=>"e")
-		TkRadioButton.new(@searchEntry, "text" => 'all words', "variable" => @searchstyle, "value" => 'all').grid( :column => 3, :row => 1, :sticky=>"we")
-		TkRadioButton.new(@searchEntry, "text" => 'any words', "variable" => @searchstyle, "value" => 'any').grid( :column => 4, :row => 1, :sticky=>"w")
-		# TkRadioButton.new(@searchEntry, "text" => 'all by Actor:', "variable" => @searchstyle, "value" => 'person', "state"=>"disabled").grid( :column => 3, :row => 3, :sticky=>"w")
-
-
+		TkRadioButton.new(searchstylebox, "text" => 'exact phrase', "variable" => @searchstyle, "value" => 'phrase').grid( :column => 2, :row => 1, :sticky=>"w")
+		TkRadioButton.new(searchstylebox, "text" => 'all words', "variable" => @searchstyle, "value" => 'all').grid( :column => 3, :row => 1, :sticky=>"w")
+		TkRadioButton.new(searchstylebox, "text" => 'any words', "variable" => @searchstyle, "value" => 'any').grid( :column => 2, :row => 2, :sticky=>"w")
+		TkRadioButton.new(searchstylebox, "text" => 'affects/checks variable:', "variable" => @searchstyle, "value" => 'variable').grid( :column => 3, :row => 2, :sticky=>"w")
 
 		@selectedLine = TkVariable.new
 		@resultsCount = TkVariable.new
@@ -729,9 +739,7 @@ class GUIllaume
 		}) 
 	end
 	def buildBrowserPage()
-
 		# PAGE 2:
-
 		@convoDisplayArea = TkFrame.new(@page2)
 		@convoDisplayArea.grid(:column=>3, :row=>3, :sticky=>"sewn" )
 
@@ -1150,22 +1158,22 @@ class GUIllaume
 		searchStr=@searchStr.value
 		searchResults=""
 
-		case @searchstyle
-		when "phrase"
-			@searchByPhrase=true
-			@searchAnyWord=false
-		when "all"
-			@searchByPhrase=false
-			@searchAnyWord=false
-		when "any"
-			@searchByPhrase=false
-			@searchAnyWord=true
-		else
-			@searchByPhrase=false
-			@searchAnyWord=false
-		end
+		# case @searchstyle
+		# when "phrase"
+		# 	@searchByPhrase=true
+		# 	@searchAnyWord=false
+		# when "all"
+		# 	@searchByPhrase=false
+		# 	@searchAnyWord=false
+		# when "any"
+		# 	@searchByPhrase=false
+		# 	@searchAnyWord=true
+		# else
+		# 	@searchByPhrase=false
+		# 	@searchAnyWord=false
+		# end
 
-		@lineSearch=@explorer.searchlines(searchStr,@actorlimit,@searchByPhrase, @searchAnyWord)
+		@lineSearch=@explorer.searchlines(searchStr,@actorlimit,@searchstyle)
 		@resultsCount.value="Found: #{@lineSearch.length} results:"
 		itemsinbox=@searchlistbox.size
 
