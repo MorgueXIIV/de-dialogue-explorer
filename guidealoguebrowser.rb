@@ -488,7 +488,7 @@ class DialogueExplorer
 		if maxsearch>0
 			query+="limit #{maxsearch}"
 		end
-		puts query
+		# puts query
 		searchDias=$db.execute query
 
 		@searchOptions=searchDias
@@ -631,10 +631,10 @@ class GUIllaume
 
 		TkGrid.columnconfigure @root, 0, :weight => 1
 		TkGrid.rowconfigure @root, 0, :weight => 1
+		buildConfigPage
 		buildSearcherPage
 		buildBrowserPage
 		buildDumpPage
-		buildConfigPage
 	end
 
 	def buildSearcherPage()
@@ -746,36 +746,44 @@ class GUIllaume
 		@underButtonFrame = TkFrame.new(@page2)
 		@underButtonFrame.grid(:column=>3,:row=>5, :sticky=>"sewn" )
 
-		@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 2; wrap "word"; background "grey"}
-		@forwButtonArea.grid(:column => 0, :row => 1, :sticky => 'nwes')
-		TkGrid.columnconfigure(@underButtonFrame, 0, :weight => 1)
-		TkGrid.rowconfigure @underButtonFrame, 1, :weight => 1
-
-		fbys = TkScrollbar.new(@underButtonFrame) {orient 'vertical'}
-		fbys.grid( :column => 1, :row => 0, :sticky => 'ns')
-
-		@forwButtonArea['yscrollcommand'] = proc{|*args| fbys.set(*args);}
-		fbys.command proc{|*args| @forwButtonArea.yview(*args);}
-
 		@overButtonFrame = TkFrame.new(@page2)
 		@overButtonFrame.grid(:column=>3,:row=>1, :sticky=>"sewn" )
 
-		@backButtonArea = TkText.new(@overButtonFrame) {width 40; height 2; wrap "word"; background "grey"}
-		@backButtonArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
-		TkGrid.columnconfigure(@overButtonFrame, 0, :weight => 1)
-		TkGrid.rowconfigure @overButtonFrame, 0, :weight => 1
+		if @browserButtons.value.to_i >0 then
+			@forwButtonArea = TkText.new(@underButtonFrame) {width 40; height 2; wrap "word"; background "grey"; height 3}
+			@forwButtonArea.grid(:column => 0, :row => 1, :sticky => 'nwes')
+			TkGrid.columnconfigure(@underButtonFrame, 0, :weight => 1)
+			TkGrid.rowconfigure @underButtonFrame, 1, :weight => 1
 
-		bbys = TkScrollbar.new(@overButtonFrame) {orient 'vertical'}
-		bbys.grid( :column => 1, :row => 0, :sticky => 'ns')
+			fbys = TkScrollbar.new(@underButtonFrame) {orient 'vertical'}
+			fbys.grid( :column => 1, :row => 0, :sticky => 'ns')
 
-		@backButtonArea['yscrollcommand'] = proc{|*args| bbys.set(*args);}
-		bbys.command proc{|*args| @backButtonArea.yview(*args);}
+			@forwButtonArea['yscrollcommand'] = proc{|*args| fbys.set(*args);}
+			fbys.command proc{|*args| @forwButtonArea.yview(*args);}
+
+
+			@backButtonArea = TkText.new(@overButtonFrame) {width 40; height 2; wrap "word"; background "grey"; height 3}
+			@backButtonArea.grid(:column => 0, :row => 0, :sticky => 'nwes')
+			TkGrid.columnconfigure(@overButtonFrame, 0, :weight => 1)
+			TkGrid.rowconfigure @overButtonFrame, 0, :weight => 1
+
+			bbys = TkScrollbar.new(@overButtonFrame) {orient 'vertical'}
+			bbys.grid( :column => 1, :row => 0, :sticky => 'ns')
+
+			@backButtonArea['yscrollcommand'] = proc{|*args| bbys.set(*args);}
+			bbys.command proc{|*args| @backButtonArea.yview(*args);}
+		end
+
+				# ADD BACK BUTTONS
+		TkButton.new(@overButtonFrame, "text"=> "Undo last backward step", "command" => proc{@explorer.removeLine(true);traceLine;@convoArea.see(1.0)}).grid(:row =>2, :column => 0, :sticky => 'sewn', :columnspan=>2)
+
+		TkButton.new(@underButtonFrame, "text"=> "Undo last forward step", "command" => proc{@explorer.removeLine(false);traceLine;@convoArea.see("end")}).grid(:row =>0, :column => 0, :sticky => 'sewn', :columnspan=>2)
 
 		TkGrid.columnconfigure @page2, 3, :weight => 1
 
 		TkGrid.rowconfigure @page2, 3, :weight => 3
-		TkGrid.rowconfigure @page2, 1, :weight => 1
-		TkGrid.rowconfigure @page2, 5, :weight => 1
+		# TkGrid.rowconfigure @page2, 1, :weight => 1
+		# TkGrid.rowconfigure @page2, 5, :weight => 1
 
 		@upda=proc{updateConversation}
 		@updas=proc{updateConversation(true)}
@@ -878,6 +886,18 @@ class GUIllaume
 	    	"offvalue" => false)
 	    browsehlcheckbox.grid(:row=>5, :column=>5,:sticky => 'w')
 
+
+	    @browserButtons = TkVariable.new
+		@browserButtons.value = 0
+	    browserbuttonchanger=proc{buildBrowserPage;traceLine}
+	    browsebutcheckbox = TkCheckButton.new(@browseDisplayOptions,
+			"text"=>'show buttons instead of links?',
+	    	"variable" =>@browserButtons,
+	    	"command"=>browserbuttonchanger,
+	    	"onvalue" => 1, 
+	    	"offvalue" => 0)
+	    browsebutcheckbox.grid(:row=>6, :column=>5,:sticky => 'w')
+
 	    @fontOption = TkVariable.new
 		@fontOption.value="courier 13"
 
@@ -903,10 +923,6 @@ class GUIllaume
 
 		colget=proc{@highlightColour=Tk::chooseColor :initialcolor => @highlightColour;@dispoptions.background=@highlightColour}
 		TkButton.new(@browseDisplayOptions, "text"=> 'Highlight Colour:', "command"=> colget).grid( :column => 3, :row => 4, :sticky => 'sewn')
-
-
-
-		# TkFont::Fontchooser.hide
 	end
 
 
@@ -919,7 +935,6 @@ class GUIllaume
 			textarea.tag_configure('markdownitalic', :font=>"#{@fontOption} italic")
 			textarea.tag_configure('markdownblank', :font=>"#{@fontOption}")
 		end
-
 	end
 
 	def lineSelect()
@@ -976,6 +991,7 @@ class GUIllaume
 		$db.execute "insert into meta(tuple,value) values ('detailshow','#{@browserShowMore.value}');"
 		$db.execute "insert into meta(tuple,value) values ('altsshow','#{@browserShowAlts.value}');"
 		$db.execute "insert into meta(tuple,value) values ('hlcolour','#{@highlightColour}');"
+		$db.execute "insert into meta(tuple,value) values ('browserbuttons','#{@browserButtons}');"
 	end
 
 	def loseConfigs()
@@ -985,6 +1001,8 @@ class GUIllaume
 		$db.execute "delete from meta where tuple='detailshow';"
 		$db.execute "delete from meta where tuple='altsshow';"
 		$db.execute "delete from meta where tuple='hlcolour';"
+		$db.execute "delete from meta where tuple='browserbuttons';"
+
 	end
 
 	def loadConfigs()
@@ -1004,6 +1022,8 @@ class GUIllaume
 				@browserShowAlts.value=config[1]
 			when 'hlcolour'
 				@highlightColour=config[1]
+			when 'browserbuttons'
+				@browserButtons.value=config[1]
 			end
 		end
 	end
@@ -1070,6 +1090,23 @@ class GUIllaume
 		else
 			printText(@convoArea,convo)
 		end
+
+		if @browserButtons.value.to_i<1 then
+			optionsStrs=@explorer.getForwardOptStrs
+			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);traceLine;@convoArea.see("end")} }
+			optionsStrs.each_with_index do |par, i|
+				@convoArea.insert("end","#{i+1}: #{par}\n", "flineoption#{i}")
+				@convoArea.tag_bind("flineoption#{i}", '1', @chbuttoncommands[i])
+				@convoArea.tag_configure("flineoption#{i}",  :font=>"#{@fontOption}", :underline=>true)
+			end
+			optionsStrs=@explorer.getBackwardOptStrs
+			@pabuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectBackTraceOpt(i);traceLine;@convoArea.see(1.0)} }
+			optionsStrs.each_with_index do |par, i|
+				@convoArea.insert((1.0+i),"#{i+1}: #{par}\n", "blineoption#{i}")
+				@convoArea.tag_bind("blineoption#{i}", '1', @pabuttoncommands[i])
+				@convoArea.tag_configure("blineoption#{i}",  :font=>"#{@fontOption}", :underline=>true)
+			end
+		end
 	end
 
 	def dumpLine()
@@ -1093,14 +1130,18 @@ class GUIllaume
 
 	def traceLine()
 		# @page2.state="normal"
-		@backButtonArea.state="normal"
-		@forwButtonArea.state="normal"
+		if @browserButtons.value.to_i >0 then
+			@backButtonArea.state="normal"
+			@forwButtonArea.state="normal"
+		end
 		@note.select(1)
 		numberofbuttonstostack=5
 		buttonwidth=250
 
 		if @explorer.collectionStarted
 			@explorer.traceBackOrForth(false)
+			@explorer.traceBackOrForth(true)
+			updateConversation
 			optionsStrs=@explorer.getForwardOptStrs
 
 			if @childButtons.nil? or @childButtons.empty? then
@@ -1110,16 +1151,19 @@ class GUIllaume
 					butter.destroy()
 				end
 				@childButtons=[]
-				@chbuttoncommands=[]
 			end
-
+			@chbuttoncommands=[]
 			@chbuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectForwTraceOpt(i);traceLine;@convoArea.see("end")} }
 			optionsStrs.each_with_index do |par, i|
-				@childButtons.push(TkButton.new(@forwButtonArea, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>buttonwidth))
-				TkTextWindow.new(@forwButtonArea, "end", :window => @childButtons[i])
+				if @browserButtons.value.to_i >0 then
+					@childButtons.push(TkButton.new(@forwButtonArea, "text"=> par, "command" => @chbuttoncommands[i], "wraplength"=>buttonwidth))
+					TkTextWindow.new(@forwButtonArea, "end", :window => @childButtons[i])
+				# else
+				# 	@convoArea.insert("end","#{i+1}: #{par}\n", "flineoption#{i}")
+				# 	@convoArea.tag_bind("flineoption#{i}", '1', @chbuttoncommands[i])
+				# 	@convoArea.tag_configure("flineoption#{i}",  :font=>"#{@fontOption}", :underline=>true)
+				end
 			end
-
-			@explorer.traceBackOrForth(true)
 			optionsStrs=@explorer.getBackwardOptStrs
 
 			if not(@parentButtons.nil? or @parentButtons.empty?) then
@@ -1133,21 +1177,21 @@ class GUIllaume
 
 			@pabuttoncommands=Array.new(optionsStrs.length) { |i| proc{@explorer.selectBackTraceOpt(i);traceLine;@convoArea.see(1.0)} }
 			optionsStrs.each_with_index do |par, i|
-				@parentButtons.push(TkButton.new(@backButtonArea, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>buttonwidth))
-				TkTextWindow.new(@backButtonArea, "end", :window => @parentButtons[i])
+				if @browserButtons.value.to_i >0 then
+					@parentButtons.push(TkButton.new(@backButtonArea, "text"=> par, "command" => @pabuttoncommands[i], "wraplength"=>buttonwidth))
+					TkTextWindow.new(@backButtonArea, "end", :window => @parentButtons[i])
+				# else
+				# 	@convoArea.insert((1.0+i),"#{i+1}: #{par}\n", "blineoption#{i}")
+				# 	@convoArea.tag_bind("blineoption#{i}", '1', @pabuttoncommands[i])
+				# 	@convoArea.tag_configure("blineoption#{i}",  :font=>"#{@fontOption}", :underline=>true)
+				end
 			end
-			@backButtonArea.state="disabled"
-			@forwButtonArea.state="disabled"
+			
+			if @browserButtons.value.to_i >0 then
+				@backButtonArea.state="disabled"
+				@forwButtonArea.state="disabled"
+			end
 
-				# ADD BACK BUTTONS
-				@parentButtons.push(TkButton.new(@overButtonFrame, "text"=> "Undo last backward step", "command" => proc{@explorer.removeLine(true);traceLine;@convoArea.see(1.0)}, "wraplength"=>buttonwidth))
-
-				@parentButtons.last.grid(:row =>2, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
-
-				@childButtons.push(TkButton.new(@underButtonFrame, "text"=> "Undo last forward step", "command" => proc{@explorer.removeLine(false);traceLine;@convoArea.see("end")}, "wraplength"=>buttonwidth))
-
-				@childButtons.last.grid(:row =>0, :column => 0, :sticky => 'sewn', :columnspan=>numberofbuttonstostack)
-			updateConversation
 
 		end
 	end
@@ -1189,7 +1233,7 @@ end
 begin
 	# opens a DB file to search
 	$db = SQLite3::Database.open 'test.db'
-	$VersionNumber="FAY-DE Playback Experiment - Version 0.21.02.13"
+	$VersionNumber="FADYE Playback Experiment - Version 0.21.02.22"
     GUIllaume.new()
 	
 	Tk.mainloop
