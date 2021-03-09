@@ -314,7 +314,7 @@ class DialogueExplorer
 	end
 
 	def getSearchOptStrs(lomg=false)
-		optStrs=@searchOptions.map { |e| e[3].length>3 ? "#{e[2]}: #{e[3]}" : e[4] }
+		optStrs=@searchOptions.map { |e| (e[4]=="ALT" ? "(ALT)" : "") + (e[3].length>3 ? "#{e[2]}: #{e[3]}" : e[4]) }
 		return optStrs
 	end
 
@@ -454,12 +454,15 @@ class DialogueExplorer
 		maxsearch=0
 		#us SQL query to get the line IDs when they partial match the provided input string.
 		#for performance reasons, willl no longer get the IDs and make objects, that was INSANELY slow
+		altquery="SELECT dentries.conversationid,dentries.id,actors.name, alternates.alternateline, 'ALT' FROM dentries INNER JOIN actors ON dentries.actor=actors.id left join alternates on alternates.conversationid=dentries.conversationid and alternates.dialogueid=dentries.id "
 		query= "SELECT dentries.conversationid,dentries.id,actors.name, dentries.dialoguetext, dentries.title FROM dentries INNER JOIN actors ON dentries.actor=actors.id "
 		if searchQ.strip.length==0 then
 			query+= " where actor='#{actorlimit.to_i}'"
+			altquery+= " where actor='#{actorlimit.to_i}'"
 		elsif searchStyle=="variable"
 			searchwords=searchQ.split(" ")
 			searchwords.reject!{|e| e.length<2}
+			altquery=""
 			if searchwords.length>0 and searchwords.length<5 then
 				searchwords.map! { |e| "(dentries.userscript LIKE '%#{e}%')"}
 				boolop = " and "
@@ -470,26 +473,35 @@ class DialogueExplorer
 			end				
 		elsif searchStyle=="phrase" then
 			query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+			altquery+= " WHERE alternates.alternateline LIKE '%#{searchQ}%'"
 		else
 			searchwords=searchQ.split(" ")
 			searchwords.reject!{|e| e.length<3}
 			if searchwords.length>0 and searchwords.length<20 then
-				searchwords.map! { |e| "(dentries.dialoguetext LIKE '%#{e}%')"}
+				corewords=searchwords.map { |e| "(dentries.dialoguetext LIKE '%#{e}%')"}
+				altwords=searchwords.map { |e| "(alternates.alternateline LIKE '%#{e}%')"}
 				boolop = searchStyle=="any" ? " or " : " and "
-				query+="WHERE (#{searchwords.join(boolop)})"
+				query+="WHERE (#{corewords.join(boolop)})"
+				altquery+="WHERE (#{altwords.join(boolop)})"
 			else
 				query+= " WHERE dentries.dialoguetext LIKE '%#{searchQ}%'"
+				altquery+= " WHERE alternates.alternateline LIKE '%#{searchQ}%'"
 			end
 		end
 
 		if actorlimit.to_i>0
 			query+=" and actor='#{actorlimit.to_i}'"
+			altquery+=" and actor='#{actorlimit.to_i}'"
 		end
 		if maxsearch>0
 			query+="limit #{maxsearch}"
 		end
 		# puts query
+		# puts altquery
 		searchDias=$db.execute query
+		if altquery.length>1
+			searchDias+=$db.execute altquery
+		end
 
 		@searchOptions=searchDias
 
@@ -603,9 +615,9 @@ class GUIllaume
 	def initialize()
 		@actorlimit=0
 		@root = TkRoot.new { title "FAYDE Playback Experiment" }
-		# @root.iconbitmap('FAYDE-PbEx.ico')
-		# @root['minsize'] = 50, 50
-		# @root['maxsize'] = 70, 70
+	    @versionInfo = TkVariable.new($versionNumber)
+		TkLabel.new("textvariable"=>@versionInfo).grid(:row=>10,:column=>0,:sticky => 'news')
+
 
 		@explorer=DialogueExplorer.new()
 
@@ -618,16 +630,16 @@ class GUIllaume
 		@page2 = TkFrame.new(@note)
 		@page3 = TkFrame.new(@note)		
 		@note.add @page1, :text => 'Search'
-		@note.add @page2, :text => 'Browse', :state=>"normal"
-		@note.add @page3, :text => 'Dialogue Dump', :state =>'normal'
+		@note.add @page2, :text => 'Browse', :state=>'disabled'
+		@note.add @page3, :text => 'Dialogue Dump', :state =>'disabled'
 		
 		@pageLAST = TkFrame.new(@note)
 		@note.add @pageLAST, :text => 'Display Options', :state =>'normal'
 
 		@note.grid(:row=>0,:column=>0,:sticky => 'news')
 
-		TkLabel.new("text"=>$VersionNumber).grid(:row=>10,:column=>0,:sticky => 'news')
-
+		loadConfigs
+		checkDatabase
 
 		TkGrid.columnconfigure @root, 0, :weight => 1
 		TkGrid.rowconfigure @root, 0, :weight => 1
@@ -836,59 +848,48 @@ class GUIllaume
 		@browseDisplayOptions.grid(:column=>3, :row=>0, :sticky=>"sewn" )
 
 		# TkLabel.new(@page2, "textvariable" => @pickmeline, "wraplength"=>400).grid( :column => 1, :row => 4, :sticky => 'sw')
-		@browserMarkdown = TkVariable.new
-		@browserMarkdown.value = true
+
 		browsemarkcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show markdown tags?',
 	    	"command" =>@updas,
 	    	"variable" =>@browserMarkdown,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
+	    	"onvalue" => 1, 
+	    	"offvalue" => 0)
 	    browsemarkcheckbox.grid(:row=>1, :column=>5,:sticky => 'w')
 
-		@browserHubs = TkVariable.new
-		@browserHubs.value = false 
 	    browsehubscheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show hubs?',
 	    	"command" =>@upda,
 	    	"variable" =>@browserHubs,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
+	    	"onvalue" => 1, 
+	    	"offvalue" => 0)
 	    browsehubscheckbox.grid(:row=>2, :column=>5,:sticky => 'w')
 
-	    @browserShowMore = TkVariable.new
-		@browserShowMore.value = true
 	    browselomgcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show details?',
 	    	"command" =>@upda,
 	    	"variable" =>@browserShowMore,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
+	    	"onvalue" => 1, 
+	    	"offvalue" => 0)
 	    browselomgcheckbox.grid(:row=>3, :column=>5,:sticky => 'w')
 
-	    @browserShowAlts = TkVariable.new
-		@browserShowAlts.value = true
 	    browsealtscheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show alternate lines?',
 	    	"command" =>@upda,
 	    	"variable" =>@browserShowAlts,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
+	    	"onvalue" => 1, 
+	    	"offvalue" => 0)
 	    browsealtscheckbox.grid(:row=>4, :column=>5,:sticky => 'w')
 
 
-	    @browserHightlightLines = TkVariable.new
-		@browserHightlightLines.value = true
 	    browsehlcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'highlight new lines?',
 	    	"variable" =>@browserHightlightLines,
-	    	"onvalue" => true, 
-	    	"offvalue" => false)
+	    	"onvalue" => 1, 
+	    	"offvalue" => 0)
 	    browsehlcheckbox.grid(:row=>5, :column=>5,:sticky => 'w')
 
 
-	    @browserButtons = TkVariable.new
-		@browserButtons.value = 0
 	    browserbuttonchanger=proc{buildBrowserPage;traceLine}
 	    browsebutcheckbox = TkCheckButton.new(@browseDisplayOptions,
 			"text"=>'show buttons instead of links?',
@@ -898,8 +899,10 @@ class GUIllaume
 	    	"offvalue" => 0)
 	    browsebutcheckbox.grid(:row=>6, :column=>5,:sticky => 'w')
 
-	    @fontOption = TkVariable.new
-		@fontOption.value="courier 13"
+        
+		dbget=proc{@dbFname = Tk::getOpenFile; checkDatabase}
+
+		TkButton.new(@browseDisplayOptions, "text"=> 'Load Database', "command"=> dbget).grid( :column => 3, :row => 8, :sticky => 'sewn')
 
 		loadConfigs
 
@@ -912,7 +915,7 @@ class GUIllaume
 		# TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times 12',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
 		# TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica 12',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
 
-		TkButton.new(@browseDisplayOptions, "text"=> 'SAVE CONFIGS TO DB', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 10, :sticky => 'sewn')
+		TkButton.new(@browseDisplayOptions, "text"=> 'Save Configurations', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 10, :sticky => 'sewn')
 		TkButton.new(@browseDisplayOptions, "text"=> 'FORGET CONFIGS FROM DB', "command"=> proc{loseConfigs}).grid( :column => 3, :row => 11, :sticky => 'sewn')
 
 		TkFont::Fontchooser.configure :font => "courier 12", :command => proc{|f| font_changed(f);}
@@ -924,10 +927,62 @@ class GUIllaume
 		colget=proc{@highlightColour=Tk::chooseColor :initialcolor => @highlightColour;@dispoptions.background=@highlightColour}
 		TkButton.new(@browseDisplayOptions, "text"=> 'Highlight Colour:', "command"=> colget).grid( :column => 3, :row => 4, :sticky => 'sewn')
 	end
+    
+    def checkDatabase()
+    	if File.exists?(@dbFname)
+			@databaseTemp= SQLite3::Database.open @dbFname
+			presence=@databaseTemp.execute "SELECT name FROM sqlite_master WHERE type='table'ORDER BY name;"
+			presence.flatten!
+			checklist=["actors", "alternates", "checks","dentries", "dialogues", "dlinks", "meta", "modifiers", "variables"]
+			missingTables=checklist-presence
+			if missingTables.length>0 then
+				msgBox = Tk::messageBox :type   => "okcancel", :icon => "warning",:message => "Database is missing some tables and may cause crashes:", :detail => "missing tables: #{missingTables.join(", ")}"
+			else
+				msgBox="ok"
+			end
 
+			if msgBox=="ok"
+				$db=@databaseTemp
+				@missingTables=missingTables
+
+				@note.tabconfigure(0, :state =>'normal')
+				@note.tabconfigure(1, :state =>'normal')
+				@note.tabconfigure(2, :state =>'normal')
+
+				if @missingTables.include?("meta") then
+					@versionInfo.value=$versionNumber+ " (Database missing version info)"
+				else
+					version=$db.execute "select value from meta where tuple='version-date';"
+					version.flatten!
+					@versionInfo.value=$versionNumber+" - Database based on #{version.join("/")} game data"
+				end
+			end
+		else
+			if $db
+				return true
+			else
+				@note.select(3)
+				@note.tabconfigure(0, :state =>'disabled')
+				@note.tabconfigure(1, :state =>'disabled')
+				@note.tabconfigure(2, :state =>'disabled')
+
+				# @page1.itemconfigure("state" => "disabled")
+
+			end
+
+		end
+    end
+
+    def fontCheck()
+    	font=@fontOption.value
+		if font.split(" ")[-1].to_i<1 then
+			@fontOption.value=font.strip+" 12"
+		end
+	end
 
 	def font_changed(font)
 		@fontOption.value = font
+		fontCheck
 		@dispoptions['font'] = @fontOption.value
 		fontUsers=[@convoArea,@dumpTextBox]
 		fontUsers.each do |textarea|
@@ -982,49 +1037,90 @@ class GUIllaume
 	end
 
 	def saveConfigs()
-		$db.execute "CREATE TABLE IF NOT EXISTS meta (tuple TEXT, value TEXT)"
-		loseConfigs
 
-		$db.execute "insert into meta(tuple,value) values ('font','#{@fontOption.value}');"
-		$db.execute "insert into meta(tuple,value) values ('markdown','#{@browserMarkdown.value}');"
-		$db.execute "insert into meta(tuple,value) values ('hubsshow','#{@browserHubs.value}');"
-		$db.execute "insert into meta(tuple,value) values ('detailshow','#{@browserShowMore.value}');"
-		$db.execute "insert into meta(tuple,value) values ('altsshow','#{@browserShowAlts.value}');"
-		$db.execute "insert into meta(tuple,value) values ('hlcolour','#{@highlightColour}');"
-		$db.execute "insert into meta(tuple,value) values ('browserbuttons','#{@browserButtons}');"
+		configFileName="FAYDEconfig.txt"
+
+		confStr="database:#{@dbFname}\nfont:#{@fontOption.value}\nmarkdown:#{@browserMarkdown.value}\nhubsshow:#{@browserHubs.value}\ndetailshow:#{@browserShowMore.value}\naltsshow:#{@browserShowAlts.value}\nhlcolour:#{@highlightColour}\nbrowserbuttons:#{@browserButtons}\n"
+		
+		File.write(configFileName, confStr) #, mode: "w")
+
+		# $db.execute "CREATE TABLE IF NOT EXISTS meta (tuple TEXT, value TEXT)"
+		# loseConfigs
+
+		# $db.execute "insert into meta(tuple,value) values ('font','#{@fontOption.value}');"
+		# $db.execute "insert into meta(tuple,value) values ('markdown','#{@browserMarkdown.value}');"
+		# $db.execute "insert into meta(tuple,value) values ('hubsshow','#{@browserHubs.value}');"
+		# $db.execute "insert into meta(tuple,value) values ('detailshow','#{@browserShowMore.value}');"
+		# $db.execute "insert into meta(tuple,value) values ('altsshow','#{@browserShowAlts.value}');"
+		# $db.execute "insert into meta(tuple,value) values ('hlcolour','#{@highlightColour}');"
+		# $db.execute "insert into meta(tuple,value) values ('browserbuttons','#{@browserButtons}');"
 	end
 
-	def loseConfigs()
-		$db.execute "delete from meta where tuple='font';"
-		$db.execute "delete from meta where tuple='markdown';"
-		$db.execute "delete from meta where tuple='hubsshow';"
-		$db.execute "delete from meta where tuple='detailshow';"
-		$db.execute "delete from meta where tuple='altsshow';"
-		$db.execute "delete from meta where tuple='hlcolour';"
-		$db.execute "delete from meta where tuple='browserbuttons';"
-
-	end
+	# def loseConfigs()
+	# 	$db.execute "delete from meta where tuple='font';"
+	# 	$db.execute "delete from meta where tuple='markdown';"
+	# 	$db.execute "delete from meta where tuple='hubsshow';"
+	# 	$db.execute "delete from meta where tuple='detailshow';"
+	# 	$db.execute "delete from meta where tuple='altsshow';"
+	# 	$db.execute "delete from meta where tuple='hlcolour';"
+	# 	$db.execute "delete from meta where tuple='browserbuttons';"
+	# end
 
 	def loadConfigs()
 		@highlightColour='#eefff0'
-		configs=$db.execute "select tuple,value from meta;"
-		configs.each do |config|
-			case config[0]
-			when 'font'
-				@fontOption.value=config[1]
-			when 'markdown'
-				@browserMarkdown.value=config[1]
-			when 'hubsshow'
-				@browserHubs.value=config[1]
-			when 'detailshow'
-				@browserShowMore.value=config[1]
-			when 'altsshow'
-				@browserShowAlts.value=config[1]
-			when 'hlcolour'
-				@highlightColour=config[1]
-			when 'browserbuttons'
-				@browserButtons.value=config[1]
+		@browserMarkdown = TkVariable.new
+		@browserMarkdown.value = 1
+		@browserHubs = TkVariable.new
+		@browserHubs.value = 0
+	    @browserShowMore = TkVariable.new
+		@browserShowMore.value = 1
+	    @browserShowAlts = TkVariable.new
+		@browserShowAlts.value = 1
+	    @browserHightlightLines = TkVariable.new
+		@browserHightlightLines.value = 1
+	    @browserButtons = TkVariable.new
+		@browserButtons.value = 0
+	    @fontOption = TkVariable.new
+		@fontOption.value="courier 13"
+		@dbFname="test.db"
+
+		configFileName="FAYDEconfig.txt"
+		if File.exists?(configFileName)
+			configs = File.read(configFileName).split("\n")
+			configs.map! { |e| e.split(":") }
+
+			configs.each do |config|
+				case config[0]
+				when 'database'
+					@dbFname=config[1]
+				when 'font'
+					@fontOption.value=config[1]
+				when 'markdown'
+					@browserMarkdown.value=config[1]
+				when 'hubsshow'
+					@browserHubs.value=config[1]
+				when 'detailshow'
+					@browserShowMore.value=config[1]
+				when 'altsshow'
+					@browserShowAlts.value=config[1]
+				when 'hlcolour'
+					@highlightColour=config[1]
+				when 'browserbuttons'
+					@browserButtons.value=config[1]
+				end
 			end
+			fontCheck
+
+
+		# else
+		# 	@dbFname="test.db"
+		# 	@fontOption.value="courier 13"
+		# 	@browserMarkdown.value= true
+		# 	@browserHubs.value= false
+		# 	@browserShowMore.value= true
+		# 	@browserShowAlts.value= true
+		# 	@highlightColour='#eefff0'
+		# 	@browserButtons.value=0
 		end
 	end
 
@@ -1110,7 +1206,7 @@ class GUIllaume
 	end
 
 	def dumpLine()
-		# @page3["state"]=:normal
+		@note.tabconfigure(2, :state =>'normal')
 		@note.select(2)
 		@dumpTextBox.delete(1.0, 'end')
 		dump= @explorer.dialoguedump(@browserShowMore>0,@browserHubs<1,true)
@@ -1120,7 +1216,7 @@ class GUIllaume
 	end
 
 	def actorDump()
-		# @page3["state"]=:normal
+		@note.tabconfigure(2, :state =>'normal')
 		@note.select(2)
 		@dumpTextBox.delete(1.0, 'end')
 		dump= @explorer.actorDump(@actorlimit,@browserShowMore>0,@browserHubs<1,true)
@@ -1130,6 +1226,7 @@ class GUIllaume
 
 	def traceLine()
 		# @page2.state="normal"
+		@note.tabconfigure(1, :state =>'normal')
 		if @browserButtons.value.to_i >0 then
 			@backButtonArea.state="normal"
 			@forwButtonArea.state="normal"
@@ -1231,9 +1328,9 @@ end
 
 
 begin
-	# opens a DB file to search
-	$db = SQLite3::Database.open 'test.db'
-	$VersionNumber="FADYE Playback Experiment - Version 0.21.02.22"
+	# # Database opening now covered by gui functions
+	# $db = SQLite3::Database.open 'test.db'
+	$versionNumber="FAYDE Playback Experiment - Version 0.21.03.08"
     GUIllaume.new()
 	
 	Tk.mainloop
