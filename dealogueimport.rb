@@ -155,9 +155,9 @@ end
 begin
 	starttime=Time.now()
 
-	creategoodnamedDB=false
-	useJSON='Disco Elysium Cut.json'
-	# useJSON='Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json'
+	creategoodnamedDB=true
+	# useJSON='Disco Elysium Cut.json'
+	useJSON='Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json'
 
 	json= File.read(useJSON);
 	dealogues=JSON.parse(json);
@@ -242,14 +242,14 @@ begin
 
 	# CHANGE THESE VALUES IN THE SCRIPT TO ENABLE/DISABLE
 	# POPULATING CERTAIN TABLES
-	doActors=false
-	doDialogues=false
-	doDentries=false
-	doDlinks=false
-	doChecks=false
-	doModifiers=false
-	doActorTalkativeness=false
-	doAlternateLines=false
+	doActors=true
+	doDialogues=true
+	doDentries=true
+	doDlinks=true
+	doChecks=true
+	doModifiers=true
+	doActorTalkativeness=true
+	doAlternateLines=true
 	doVariables=true
 
 	#inistialise counter
@@ -289,7 +289,7 @@ begin
 
 	if (doDialogues or doAlternateLines or doChecks or doDentries or doDlinks) then
 		# shockingly complex routine to tell terminal what we're doing
-		listofthingstodothisloop=hash["dialogues" => doDialogues, "dentries" => doDentries, "dialogue links" => doDlinks, "dialogue active checks" =>doChecks, "alternate dialogue lines" => doAlternateLines]
+		listofthingstodothisloop= Hash["dialogues" => doDialogues, "dentries" => doDentries, "dialogue links" => doDlinks, "dialogue active checks" =>doChecks, "alternate dialogue lines" => doAlternateLines]
 		listofthingstodothisloop.select!{|k,v| v }
 		if listofthingstodothisloop.empty? then
 			listofthingstodothisloop= "THIS SHOULD NEVER RUN ACTUALLY"

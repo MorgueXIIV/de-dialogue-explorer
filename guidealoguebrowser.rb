@@ -898,13 +898,11 @@ class GUIllaume
 	    	"onvalue" => 1, 
 	    	"offvalue" => 0)
 	    browsebutcheckbox.grid(:row=>6, :column=>5,:sticky => 'w')
-
+		
         
 		dbget=proc{@dbFname = Tk::getOpenFile; checkDatabase}
-
-		TkButton.new(@browseDisplayOptions, "text"=> 'Load Database', "command"=> dbget).grid( :column => 3, :row => 8, :sticky => 'sewn')
-
-		loadConfigs
+		@dbfnamedisplay=TkLabel.new(@browseDisplayOptions, "text"=>@dbFname.split("/")[-1]).grid( :column => 3, :row => 1, :sticky => 'sewn')
+		TkButton.new(@browseDisplayOptions, "text"=> 'Load Database', "command"=> dbget).grid( :column => 3, :row => 2, :sticky => 'sewn')
 
 		@dispoptions=TkLabel.new(@browseDisplayOptions, "text" => "Configuration Options", "wraplength"=>400, "font"=>@fontOption.value, "background"=>@highlightColour).grid( :column => 3,  :row => 0, :columnspan=>3, :sticky => 'w')
 		fontprev=proc{@dispoptions['font'] = @fontOption.value}
@@ -915,17 +913,17 @@ class GUIllaume
 		# TkRadioButton.new(@browseDisplayOptions, "text" => 'serif', "variable" => @fontOption, "value" => 'times 12',"command"=>fontprev).grid( :column => 3, :row => 2, :sticky=>"e")
 		# TkRadioButton.new(@browseDisplayOptions, "text" => 'sansserif', "variable" => @fontOption, "value" => 'helvetica 12',"command"=>fontprev).grid( :column => 3, :row => 3, :sticky=>"e")
 
-		TkButton.new(@browseDisplayOptions, "text"=> 'Save Configurations', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 10, :sticky => 'sewn')
-		TkButton.new(@browseDisplayOptions, "text"=> 'FORGET CONFIGS FROM DB', "command"=> proc{loseConfigs}).grid( :column => 3, :row => 11, :sticky => 'sewn')
+		TkButton.new(@browseDisplayOptions, "text"=> 'Save Configs', "command"=> proc{saveConfigs}).grid( :column => 3, :row => 10, :sticky => 'sewn')
+		TkButton.new(@browseDisplayOptions, "text"=> 'Load Configs', "command"=> proc{loadConfigs}).grid( :column => 5, :row => 10, :sticky => 'sewn')
 
-		TkFont::Fontchooser.configure :font => "courier 12", :command => proc{|f| font_changed(f);}
+		TkFont::Fontchooser.configure :font => @fontOption.value, :command => proc{|f| font_changed(f);}
 
 		fontget=proc{TkFont::Fontchooser.show}
 
-		TkButton.new(@browseDisplayOptions, "text"=> 'Font Options', "command"=> fontget).grid( :column => 3, :row => 2, :sticky => 'sewn')
+		TkButton.new(@browseDisplayOptions, "text"=> 'Font Options', "command"=> fontget).grid( :column => 3, :row => 4, :sticky => 'sewn')
 
-		colget=proc{@highlightColour=Tk::chooseColor :initialcolor => @highlightColour;@dispoptions.background=@highlightColour}
-		TkButton.new(@browseDisplayOptions, "text"=> 'Highlight Colour:', "command"=> colget).grid( :column => 3, :row => 4, :sticky => 'sewn')
+		colget=proc{colorPicker}
+		TkButton.new(@browseDisplayOptions, "text"=> 'Highlight Colour:', "command"=> colget).grid( :column => 3, :row => 5, :sticky => 'sewn')
 	end
     
     def checkDatabase()
@@ -943,6 +941,9 @@ class GUIllaume
 
 			if msgBox=="ok"
 				$db=@databaseTemp
+				if not @dbfnamedisplay.nil? then 
+					@dbfnamedisplay.text=@dbFname.split("/")[-1]
+				end
 				@missingTables=missingTables
 
 				@note.tabconfigure(0, :state =>'normal')
@@ -978,6 +979,14 @@ class GUIllaume
 		if font.split(" ")[-1].to_i<1 then
 			@fontOption.value=font.strip+" 12"
 		end
+	end
+
+	def colorPicker()
+		highlightColour=Tk::chooseColor :initialcolor => @highlightColour
+		if highlightColour.length>1 
+			@highlightColour=highlightColour
+		end
+		@dispoptions.background=@highlightColour
 	end
 
 	def font_changed(font)
@@ -1043,28 +1052,7 @@ class GUIllaume
 		confStr="database:#{@dbFname}\nfont:#{@fontOption.value}\nmarkdown:#{@browserMarkdown.value}\nhubsshow:#{@browserHubs.value}\ndetailshow:#{@browserShowMore.value}\naltsshow:#{@browserShowAlts.value}\nhlcolour:#{@highlightColour}\nbrowserbuttons:#{@browserButtons}\n"
 		
 		File.write(configFileName, confStr) #, mode: "w")
-
-		# $db.execute "CREATE TABLE IF NOT EXISTS meta (tuple TEXT, value TEXT)"
-		# loseConfigs
-
-		# $db.execute "insert into meta(tuple,value) values ('font','#{@fontOption.value}');"
-		# $db.execute "insert into meta(tuple,value) values ('markdown','#{@browserMarkdown.value}');"
-		# $db.execute "insert into meta(tuple,value) values ('hubsshow','#{@browserHubs.value}');"
-		# $db.execute "insert into meta(tuple,value) values ('detailshow','#{@browserShowMore.value}');"
-		# $db.execute "insert into meta(tuple,value) values ('altsshow','#{@browserShowAlts.value}');"
-		# $db.execute "insert into meta(tuple,value) values ('hlcolour','#{@highlightColour}');"
-		# $db.execute "insert into meta(tuple,value) values ('browserbuttons','#{@browserButtons}');"
 	end
-
-	# def loseConfigs()
-	# 	$db.execute "delete from meta where tuple='font';"
-	# 	$db.execute "delete from meta where tuple='markdown';"
-	# 	$db.execute "delete from meta where tuple='hubsshow';"
-	# 	$db.execute "delete from meta where tuple='detailshow';"
-	# 	$db.execute "delete from meta where tuple='altsshow';"
-	# 	$db.execute "delete from meta where tuple='hlcolour';"
-	# 	$db.execute "delete from meta where tuple='browserbuttons';"
-	# end
 
 	def loadConfigs()
 		@highlightColour='#eefff0'
@@ -1087,40 +1075,35 @@ class GUIllaume
 		configFileName="FAYDEconfig.txt"
 		if File.exists?(configFileName)
 			configs = File.read(configFileName).split("\n")
-			configs.map! { |e| e.split(":") }
+			configs.map! { |e| e.split(":",2) }
 
 			configs.each do |config|
-				case config[0]
-				when 'database'
-					@dbFname=config[1]
-				when 'font'
-					@fontOption.value=config[1]
-				when 'markdown'
-					@browserMarkdown.value=config[1]
-				when 'hubsshow'
-					@browserHubs.value=config[1]
-				when 'detailshow'
-					@browserShowMore.value=config[1]
-				when 'altsshow'
-					@browserShowAlts.value=config[1]
-				when 'hlcolour'
-					@highlightColour=config[1]
-				when 'browserbuttons'
-					@browserButtons.value=config[1]
+				if config[1].length > 0
+					case config[0]
+					when 'database'
+						@dbFname=config[1]
+					when 'font'
+						@fontOption.value=config[1]
+					when 'markdown'
+						@browserMarkdown.value=config[1]
+					when 'hubsshow'
+						@browserHubs.value=config[1]
+					when 'detailshow'
+						@browserShowMore.value=config[1]
+					when 'altsshow'
+						@browserShowAlts.value=config[1]
+					when 'hlcolour'
+						@highlightColour=config[1]
+					when 'browserbuttons'
+						@browserButtons.value=config[1]
+					end
 				end
 			end
 			fontCheck
-
-
-		# else
-		# 	@dbFname="test.db"
-		# 	@fontOption.value="courier 13"
-		# 	@browserMarkdown.value= true
-		# 	@browserHubs.value= false
-		# 	@browserShowMore.value= true
-		# 	@browserShowAlts.value= true
-		# 	@highlightColour='#eefff0'
-		# 	@browserButtons.value=0
+			if not @dispoptions.nil? then
+				@dispoptions.background=@highlightColour
+				@dispoptions['font'] = @fontOption.value
+			end
 		end
 	end
 
@@ -1330,7 +1313,7 @@ end
 begin
 	# # Database opening now covered by gui functions
 	# $db = SQLite3::Database.open 'test.db'
-	$versionNumber="FAYDE Playback Experiment - Version 0.21.03.08"
+	$versionNumber="FAYDE Playback Experiment - Version 0.21.03.09"
     GUIllaume.new()
 	
 	Tk.mainloop
