@@ -32,7 +32,9 @@ class DialogueEntry
 		@hasalts=dialogueArray[9]
 		@conditionstring=dialogueArray[10]
 		@userscript=dialogueArray[11]
-		@difficultypass=dialogueArray[12]
+		difficultypass=dialogueArray[12]
+		@difficultypass = difficultypass>7 ? (difficultypass-7)*2-1 : difficultypass*2
+
     end
 
     def getTitle()
@@ -244,8 +246,8 @@ class DialogueEntry
 		lomgpossinfo.reject!{|info| info.nil? or info.length<2 }
 
 		if @difficultypass>0 then
-			hardness=@difficultypass+0
-			lomgpossinfo.unshift("passive #{@actor} check, (difficulty #{hardness}-ish)")
+			hardness=@difficultypass
+			lomgpossinfo.unshift("passive check (estimate; requires #{hardness} in #{@actor})")
 		end
 
 		lomginfo=lomgpossinfo.join(": ")
@@ -314,6 +316,9 @@ class DialogueExplorer
 	end
 
 	def getSearchOptStrs(lomg=false)
+		if @searchOptions.nil?
+			return []
+		end
 		optStrs=@searchOptions.map { |e| (e[4]=="ALT" ? "(ALT)" : "") + (e[3].length>3 ? "#{e[2]}: #{e[3]}" : e[4]) }
 		return optStrs
 	end
@@ -1313,7 +1318,7 @@ end
 begin
 	# # Database opening now covered by gui functions
 	# $db = SQLite3::Database.open 'test.db'
-	$versionNumber="FAYDE Playback Experiment - Version 0.21.03.09"
+	$versionNumber="FAYDE Playback Experiment - Version 0.21.4.20"
     GUIllaume.new()
 	
 	Tk.mainloop

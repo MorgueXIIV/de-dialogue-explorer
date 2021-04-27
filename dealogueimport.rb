@@ -158,6 +158,7 @@ begin
 	creategoodnamedDB=true
 	# useJSON='Disco Elysium Cut.json'
 	useJSON='Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json'
+    useJSON='Disco Elysium Final Cut-Cut.json'
 
 	json= File.read(useJSON);
 	dealogues=JSON.parse(json);

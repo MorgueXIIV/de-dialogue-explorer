@@ -1,3 +1,18 @@
+REPLACE:
+
+\s*\{\s*"title" ?: ?"(.*)",(\s*)"value" ?: ?"(.*)",\s*"type" ?: ?\d+,\s*"typeString" ?: ?".*"\s*\}(,?) BECOMES: ${2}{"${1}" : "${3}"}${4}
+
+REMOVE:
+
+,\s*"canvasRect": {\s*"x": 0.0,\s*"y": 0.0,\s*"width": 160.0,\s*"height": 30.0\s*}
+
+"overrideSettings": {\s*"useOverrides": 0,\s*"overrideSubtitleSettings": 0,\s*"showNPCSubtitlesDuringLine": 1,\s*"showNPCSubtitlesWithResponses": 1,\s*"showPCSubtitlesDuringLine": 0,\s*"skipPCSubtitleAfterResponseMenu": 0,\s*"subtitleCharsPerSecond": 30.0,
+\s*"minSubtitleSeconds": 2.0,\s*"continueButton": 0,\s*"overrideSequenceSettings": 0,\s*"defaultSequence": "",\s*"defaultPlayerSequence": "",\s*"defaultResponseMenuSequence": "",\s*"overrideInputSettings": 0,\s*"alwaysForceResponseMenu": 1,\s*"includeInvalidEntries": 0,\s*"responseTimeout": 0.0\s*},
+
+,\s*"canvasScrollPosition": {\s*"x": 0.0,\s*"y": 0.0\s*}\s*,\s*"canvasZoom": 1.0\n
+
+
+
 _________________________________
 REPLACE for ACTORS:
 \s*\{\s*"title" ?: ?"(.*)",(\s*)"value" ?: ?"(.*)",\s*"type" ?: ?\d+,\s*"typeString" ?: ?".*"\s*\}(,?) BECOMES: ${2}{"${1}" : "${3}"}${4}
