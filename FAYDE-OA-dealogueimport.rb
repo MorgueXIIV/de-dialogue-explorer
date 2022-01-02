@@ -19,7 +19,7 @@ def getUniqID(cid, did)
 	return uid
 end
 
-#this method gets a speficied attribute from a passed hash. 
+#this method gets a speficied attribute from a passed hash.
 #Crucially, ti will get it if it's a direct part of the hash, OR if it's been embedded in the "fields" hash, or if htat as is still an array... etc
 def getCLAttribute(convoOrLine, attributeToGrab)
 	if (convoOrLine.has_key?(attributeToGrab)) then
@@ -30,7 +30,7 @@ def getCLAttribute(convoOrLine, attributeToGrab)
 		else
 			return "";
 		end
-	elsif convoOrLine["fields"].is_a?(Array) 
+	elsif convoOrLine["fields"].is_a?(Array)
 		convoOrLine["fields"].each do |fieldobj|
 			if fieldobj.has_key?(attributeToGrab) then
 				return fieldobj[attributeToGrab]
@@ -38,7 +38,7 @@ def getCLAttribute(convoOrLine, attributeToGrab)
                 return fieldobj["value"]
 			end
 		end
-	else 
+	else
 		return ""
 	end
 	return ""
@@ -48,12 +48,12 @@ end
 def getIsCheckAttributes(lineCheck)
 	checkInfo=[]
 	whiteDiff=getCLAttribute(lineCheck,"DifficultyWhite")
-	if whiteDiff!=0 then
+	if whiteDiff!="" then
 		checkInfo.push(0)
 		checkInfo.push(whiteDiff)
 	else
 		redDiff=getCLAttribute(lineCheck,"DifficultyRed")
-		if redDiff!=0
+		if redDiff!=""
 			checkInfo.push(1)
 			checkInfo.push(redDiff)
 		else
@@ -147,26 +147,9 @@ end
 #TEST NEW ERROR HANDLING PLS
 begin
 	starttime=Time.now()
-	outputSQLonly=true
+	outputSQLonly=false
 
 	creategoodnamedDB=false
-	# useJSON='Disco Elysium Cut.json'
-	useJSON='Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json'
-    useJSON='Disco Elysium Final Cut-Cut.json'
-
-	json= File.read(useJSON);
-	dealogues=JSON.parse(json);
-
-	if creategoodnamedDB then
-	  	version = dealogues['version']
-		# opens a DB file, Creates our database tables
-		versioname=version.gsub(/[\/ :]/,"-")
-		dbfilename= "discobase#{versioname}.db"
-	else
-		dbfilename= "development.sqlite3"
-	end
-
-
 
 	# CHANGE THESE VALUES IN THE SCRIPT TO ENABLE/DISABLE
 	# POPULATING CERTAIN TABLES OVERRIDDEN AT CL:
@@ -177,26 +160,52 @@ begin
 	doChecks=true
 	doModifiers=true
 	doAlternateLines=true
-	doVariables=false
+	doVariables=true
+	# useJSON='Disco Elysium Cut.json'
+	useJSON='Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json'
+	useJSON='Disco Elysium Final Cut-Cut.json'
+	useJSON='DEJamaisVu.json'
 
-	puts """Type the collowing characters before pressing enter to so these tables/opts: \n
+
+	puts "press enter to read JSON: #{useJSON} (kinda time consuming)"
+	gets
+	json= File.read(useJSON);
+	dealogues=JSON.parse(json);
+	puts """Type the following characters before pressing enter to SKIP these tables: \n
 	(a)ctors, \n varia(b)les, \n (c)onversations, \n (d)ialogues, \n alternat(e) lines, \n
-	modi(f)iers, \n (g)o directly into DB (not outputing sql file) , \n c(h)ecks, \n dialogue l(i)nks 
+	modi(f)iers,  \n c(h)ecks, \n dialogue l(i)nks\n
+	\n Or enable these options: \n (s) don't put direct to DB, output sql file \n use generic (p)roduction.sql name not named w/ date info
 	\n (enter nothing to do whatever's set in the script itself.) """
 
-	opts = gets.chomp.downcase
+	opts = gets
+	opts = opts.chomp.downcase
 
-	if opts.length > 0
-	doActors = not opts.index("a").nil?
-	doDialogues = not opts.index("d").nil?
-	doConversations = not opts.index("c").nil?
-	doDialoguelinks = not opts.index("i").nil?
-	doChecks = not opts.index("h").nil?
-	doModifiers = not opts.index("f").nil?
-	doAlternateLines = not opts.index("e").nil?
-	doVariables = not opts.index("b").nil?
-	outputSQLonly  = not opts.index("g").nil?
+	if opts.length > 0 then
+		doActors = ( opts.index("a").nil?)
+		doDialogues = ( opts.index("d").nil?)
+		doConversations = (opts.index("c").nil?)
+		doDialoguelinks = (opts.index("i").nil?)
+		doChecks = (opts.index("h").nil?)
+		doModifiers = (opts.index("f").nil?)
+		doAlternateLines = (opts.index("e").nil?)
+		doVariables = (opts.index("b").nil?)
+		outputSQLonly = (not opts.index("s").nil?)
+		creategoodnamedDB = (opts.index("p").nil?)
+	end
+	doVariables=false #I just didn't rly implement it yet
 
+
+
+	if creategoodnamedDB then
+		version = dealogues['version']
+		# opens a DB file, Creates our database tables
+		versioname=version.gsub(/[\/ :]/,"-")
+		dbfilename= "discobase#{versioname}.db"
+		sqlfilen = "discoData#{versioname}.sql"
+	else
+		dbfilename= "development.sqlite3"
+		sqlfilen = "discoData.sql"
+	end
 
 	# these strings represent the various keys we need from each hash to fed into the database
 	# stored in an ITERABLE array so we can easily use them in a method for a nice DRY grab of data to insert
@@ -215,21 +224,42 @@ begin
  	# SORRY! Fucking PROCS... why? BECAUSE of scope headaches, and my own laziness. Have fun!
 	execOrWrite = Proc.new do | statement, atts=[] |
 		if outputSQLonly
-			if atts.length>0
-				statement = statement.sub(/\( ?\?[? ,]*\)/, "(#{atts.join(",")})")
+			if atts.length>0 then
+				statement = statement.sub(/\( ?\?[? ,]*\)/, "(\"#{atts.join("\",\"")})\"")
 			end
 			sqlStatements.push(statement)
 		else
-			db.execute(statement)
+			db.execute(statement,atts)
 		end
 	end
 
-
-	#inistialise counter
-	numberOfdbEntriesMade=0;
 	#using transactions means the database is written to all at once making all these entries
 	#which is MUCH much faster in SQLite than making a committed transation for each of the 10,000 + entries
 	db.transaction if not outputSQLonly
+
+	execOrWrite.call ('CREATE TABLE IF NOT EXISTS "actors" ("id" integer NOT NULL PRIMARY KEY, "name" varchar DEFAULT NULL, "dialogues_count" integer)')
+
+	execOrWrite.call ('CREATE TABLE IF NOT EXISTS "alternates" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "alternateline" varchar, "conditionstring" varchar, "dialogue_id" integer, CONSTRAINT "fk_rails_989622cdad" FOREIGN KEY ("dialogue_id") REFERENCES "dialogues" ("id"))')
+
+		execOrWrite.call ('CREATE TABLE IF NOT EXISTS "ar_internal_metadata" ("key" varchar NOT NULL PRIMARY KEY, "value" varchar, "created_at" datetime NOT NULL, "updated_at" datetime NOT NULL)')
+
+		execOrWrite.call ('CREATE TABLE  IF NOT EXISTS "checks" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "isred" varchar, "difficulty" varchar, "flagname" varchar, "skilltype" varchar, "dialogue_id" integer, CONSTRAINT "fk_rails_4e5056ee06" FOREIGN KEY ("dialogue_id")  REFERENCES "dialogues" ("id"))')
+
+		execOrWrite.call ('CREATE TABLE  IF NOT EXISTS "conversations" ("id" integer NOT NULL PRIMARY KEY, "title" varchar DEFAULT NULL, "description" text DEFAULT NULL, "dialogues_count" integer)')
+
+		execOrWrite.call ('CREATE TABLE  IF NOT EXISTS "dialogue_links" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "origin_id" integer, "destination_id" integer, "priority" integer)')
+
+		execOrWrite.call ('CREATE TABLE  IF NOT EXISTS "dialogues" ("id" integer NOT NULL PRIMARY KEY, "conversation_id" integer DEFAULT NULL, "dialoguetext" text DEFAULT NULL, "incid" integer DEFAULT NULL, "actor_id" integer DEFAULT NULL, "title" varchar DEFAULT NULL, "difficultypass" integer DEFAULT NULL, "sequence" text DEFAULT NULL, "conditionstring" text DEFAULT NULL, "userscript" text DEFAULT NULL, "origins_count" integer, "destinations_count" integer, "alternates_count" integer, "checks_count" integer)')
+
+		execOrWrite.call ('CREATE TABLE  IF NOT EXISTS "modifiers" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "variable" varchar, "modification" varchar, "tooltip" varchar, "dialogue_id" integer, CONSTRAINT "fk_rails_cda90a9c98" FOREIGN KEY ("dialogue_id")  REFERENCES "dialogues" ("id"))')
+
+
+
+			#inistialise counter
+			numberOfdbEntriesMade=8;
+
+
+
 
 	#Loop over the actors array, create a hash of relevant attributes (concatenate descriptions), stick them in the database
 	if doActors then
@@ -262,7 +292,7 @@ begin
 		listofthingstodothisloop.select!{|k,v| v }
 		if listofthingstodothisloop.empty? then
 			listofthingstodothisloop= "THIS SHOULD NEVER RUN ACTUALLY"
-		else 
+		else
 			listofthingstodothisloop=listofthingstodothisloop.keys.join(", ")
 			listofthingstodothisloop += "(this is the BIG DATASET, pls be patient)"
 		end
@@ -277,68 +307,86 @@ begin
 				execOrWrite.call "INSERT INTO conversations (id, title, description) VALUES (?,?,?)", conversationAtts;
 				numberOfdbEntriesMade+=1;
 			end
-			
+
 			#SUB LOOP; for every conversation we also need to enter the many sub-lines of that conversation
-			for thisLine in thisConvo["dialogueEntries"] do
-				checkData=getIsCheckAttributes(thisLine)
-				altData=getLineAlternatesArrays(thisLine)
-				if doDialogues then
-					lineAtts=[]
-					lineAtts=getArrayForDB(thisLine,listOfLineAtts);
-					did=lineAtts[0]
-					cid=lineAtts[1]
-					#reassurance dot every 1000 records
-					print '.' if ((cid % 1000) == 0) 
-					uid=getUniqID(cid,did)
-					lineAtts.unshift(uid)
+			if thisConvo.has_key?("dialogueEntries") then
+				for thisLine in thisConvo["dialogueEntries"] do
+					checkData=getIsCheckAttributes(thisLine)
+					altData=getLineAlternatesArrays(thisLine)
+					modData=getCheckModifiersArrays(thisLine);
+					numberOfOutLinks=0
+					if thisLine.has_key?("outgoingLinks") then
+						numberOfOutLinks=thisLine["outgoingLinks"].length
+					end
+					if doDialogues then
+						lineAtts=[]
+						lineAtts=getArrayForDB(thisLine,listOfLineAtts);
+						did=lineAtts[0]
+						cid=lineAtts[1]
+						#reassurance dot every 1000 records
+						print '.' if ((cid % 1000) == 0)
+						uid=getUniqID(cid,did)
+						lineAtts.unshift(uid)
+						lineAtts.push(numberOfOutLinks)
+						if checkData then
+							lineAtts.push(checkData.length)
+						else
+							lineAtts.push(0)
+						end
+						if altData then
+							lineAtts.push(altData.length)
+						else
+							lineAtts.push(0)
+						end
 
-					execOrWrite.call "INSERT INTO dialogues (id, incid, conversation_id, title, dialoguetext, sequence, actor_id,difficultypass,conditionstring,userscript) VALUES (?,?,?,?,?,?,?,?,?,?)", lineAtts;
-					numberOfdbEntriesMade+=1;
-				end
-
-				# insert checks and modifiers if the line has a check
-				if checkData then
-					if doChecks
-						checkData.unshift(uid)
-						checkData.unshift(nil)
-						execOrWrite.call "INSERT INTO checks (id,dialogue_id, isred, difficulty, flagname, skilltype) VALUES (?,?,?,?,?,?)", checkData;
+						execOrWrite.call "INSERT INTO dialogues (id, incid, conversation_id, title, dialoguetext, sequence, actor_id,difficultypass,conditionstring,userscript,origins_count, checks_count,alternates_count) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", lineAtts;
 						numberOfdbEntriesMade+=1;
 					end
-					if doModifiers
-						modifiers=getCheckModifiersArrays(thisLine);
-						if !(modifiers.nil? or modifiers.empty?) then
-							modifiers.each do |mod|
-								mod.unshift(uid)
-								execOrWrite.call "INSERT INTO modifiers (dialogue_id, variable, modification, tooltip) VALUES (?,?,?,?)", mod;
-								numberOfdbEntriesMade+=1
+
+					# insert checks and modifiers if the line has a check
+					if checkData then
+						if doChecks
+							checkData.unshift(uid)
+							checkData.unshift(nil)
+							execOrWrite.call "INSERT INTO checks (id,dialogue_id, isred, difficulty, flagname, skilltype) VALUES (?,?,?,?,?,?)", checkData;
+							numberOfdbEntriesMade+=1;
+
+						end
+						if doModifiers
+							if !(modData.nil? or modData.empty?) then
+								modData.each do |mod|
+									mod.unshift(uid)
+									execOrWrite.call "INSERT INTO modifiers (dialogue_id, variable, modification, tooltip) VALUES (?,?,?,?)", mod;
+									numberOfdbEntriesMade+=1
+								end
 							end
 						end
 					end
-				end
 
 
-				if doAlternateLines
-					if !(altData.nil? or altData.empty?) then
-						altData.each do |alt|
-							alt.unshift(uid)
-							alt.unshift(nil)
-							execOrWrite.call "INSERT INTO alternates (id,dialogue_id, conditionstring, alternateline) VALUES (?,?,?,?)", alt;
-							numberOfdbEntriesMade+=1;
+					if doAlternateLines
+						if !(altData.nil? or altData.empty?) then
+							altData.each do |alt|
+								alt.unshift(uid)
+								alt.unshift(nil)
+								execOrWrite.call "INSERT INTO alternates (id,dialogue_id, conditionstring, alternateline) VALUES (?,?,?,?)", alt;
+								numberOfdbEntriesMade+=1;
+							end
 						end
 					end
-				end
 
-				#add ANOTHER loop which enters any outgoing links to the links database IF they exist;
-				if doDialoguelinks
-					if thisLine.has_key?("outgoingLinks") then
-						#linksdb loop
-						for thisLink in thisLine["outgoingLinks"] do
-							linkAtt0s=[] #create array
-							linkAtts=[] #create array
-							linkAtt0s=getArrayForDB(thisLink,listOfLinkAtts);
-							linkAtts=[nil, getUniqID(linkAtt0s[0],linkAtt0s[1]), getUniqID(linkAtt0s[2],linkAtt0s[3]),linkAtt0s[4]]
-							execOrWrite.call "INSERT INTO dialogue_links (id, origin_id, destination_id, priority) VALUES (?,?,?,?)", linkAtts #SQL insert
-							numberOfdbEntriesMade+=1;
+					#add ANOTHER loop which enters any outgoing links to the links database IF they exist;
+					if doDialoguelinks
+						if thisLine.has_key?("outgoingLinks") then
+							#linksdb loop
+							for thisLink in thisLine["outgoingLinks"] do
+								linkAtt0s=[] #create array
+								linkAtts=[] #create array
+								linkAtt0s=getArrayForDB(thisLink,listOfLinkAtts);
+								linkAtts=[nil, getUniqID(linkAtt0s[0],linkAtt0s[1]), getUniqID(linkAtt0s[2],linkAtt0s[3]),linkAtt0s[4]]
+								execOrWrite.call "INSERT INTO dialogue_links (id, origin_id, destination_id, priority) VALUES (?,?,?,?)", linkAtts #SQL insert
+								numberOfdbEntriesMade+=1;
+							end
 						end
 					end
 				end
@@ -348,7 +396,37 @@ begin
 
 	if outputSQLonly then
 		puts "writing file"
-		File.write(sqlfilen,sqlStatements.join("\n"))
+		sqlText= 'BEGIN TRANSACTION;
+CREATE TABLE IF NOT EXISTS "ar_internal_metadata" (
+	"key"	varchar NOT NULL,
+	"value"	varchar,
+	"created_at"	datetime NOT NULL,
+	"updated_at"	datetime NOT NULL,
+	PRIMARY KEY("key")
+);
+CREATE TABLE IF NOT EXISTS "schema_migrations" (
+	"version"	varchar NOT NULL,
+	PRIMARY KEY("version")
+);
+INSERT INTO "ar_internal_metadata" VALUES ("environment","development","2021-04-26 11:13:37.141205","2021-05-07 22:53:46.315088");
+INSERT INTO "schema_migrations" VALUES ("20210407205704");
+INSERT INTO "schema_migrations" VALUES ("20210324025322");
+INSERT INTO "schema_migrations" VALUES ("20210324033936");
+INSERT INTO "schema_migrations" VALUES ("20210323222149");
+INSERT INTO "schema_migrations" VALUES ("20210426100757");
+INSERT INTO "schema_migrations" VALUES ("20210426100843");
+INSERT INTO "schema_migrations" VALUES ("20210426100853");
+INSERT INTO "schema_migrations" VALUES ("20210426105433");
+INSERT INTO "schema_migrations" VALUES ("20210426110413");
+INSERT INTO "schema_migrations" VALUES ("20210426112058");
+INSERT INTO "schema_migrations" VALUES ("20210426122500");
+INSERT INTO "schema_migrations" VALUES ("20210430001146");
+INSERT INTO "schema_migrations" VALUES ("20210430001611");
+INSERT INTO "schema_migrations" VALUES ("20210501110821");
+INSERT INTO "schema_migrations" VALUES ("20210503124114");
+INSERT INTO "schema_migrations" VALUES ("20210507221939");'
++sqlStatements.join("\n")+ "\nCOMMIT;"
+		File.write(sqlfilen, sqlText)
 	else
 		puts "committing DB records"
 		db.commit
@@ -361,7 +439,7 @@ begin
 	puts outputSQLonly ? "statements file" : "database" + " creation took #{timetaken} seconds"
 
 
-rescue SQLite3::Exception => e 
+rescue SQLite3::Exception => e
     puts "there was a Database Creation error: " + e.to_s;
     puts e.backtrace;
     #Rollback prevents partially complete data sets being inserted
@@ -369,10 +447,9 @@ rescue SQLite3::Exception => e
     # puts e.trace;
     db.rollback
 
-rescue JSON::UnparserError => e 
+rescue JSON::UnparserError => e
     puts "there was a JSON Parse error: " + e.to_s;
 ensure
     # close DB, success or fail
     db.close if db
 end
-
