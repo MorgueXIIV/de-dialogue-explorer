@@ -14,7 +14,7 @@ def idConvoLine(idNumber, convo)
 	return convo["dialogueEntries"][idNumber];
 end
 
-#this method gets a speficied attribute from a passed hash. 
+#this method gets a speficied attribute from a passed hash.
 #Crucially, ti will get it if it's a direct part of the hash, OR if it's been embedded in the "fields" hash, or if htat as is still an array... etc
 def getCLAttribute(convoOrLine, attributeToGrab)
 	if (convoOrLine.has_key?(attributeToGrab)) then
@@ -25,7 +25,7 @@ def getCLAttribute(convoOrLine, attributeToGrab)
 		else
 			return 0;
 		end
-	elsif convoOrLine["fields"].is_a?(Array) 
+	elsif convoOrLine["fields"].is_a?(Array)
 		convoOrLine["fields"].each do |fieldobj|
 			if fieldobj.has_key?(attributeToGrab) then
 				return fieldobj[attributeToGrab]
@@ -33,7 +33,7 @@ def getCLAttribute(convoOrLine, attributeToGrab)
                 return fieldobj["value"]
 			end
 		end
-	else 
+	else
 		return 0
 	end
 	return 0
@@ -73,7 +73,7 @@ def getCheckModifiersArrays(lineCheck)
 	i=1
 	for i in 1..10 do
 		tooltip=getCLAttribute(lineCheck,"tooltip#{i}")
-		if tooltip.length>1 then
+		if tooltip!=0 and tooltip.length>1 then
 			thisMod=[]
 			modifier=getCLAttribute(lineCheck,"modifier#{i}")
 			variable=getCLAttribute(lineCheck,"variable#{i}")
@@ -159,6 +159,8 @@ begin
 	# useJSON='Disco Elysium Cut.json'
 	useJSON='Disco Elysium Text Dump Game Version 1.0 (10_15_19) cut.json'
     useJSON='Disco Elysium Final Cut-Cut.json'
+		useJSON='DEJamaisVu.json'
+		useJSON='tfc-articy-day1.json'
 
 	json= File.read(useJSON);
 	dealogues=JSON.parse(json);
@@ -181,7 +183,7 @@ begin
 	(id INT PRIMARY KEY, name TEXT, description LONGTEXT, talkativeness INT DEFAULT 0)""";
 
 	db.execute """CREATE TABLE IF NOT EXISTS dentries
-	(id INT, title TEXT, dialoguetext TEXT, 
+	(id INT, title TEXT, dialoguetext TEXT,
 	actor INT, conversant INT, conversationid INT, difficultypass INT DEFAULT 0,
  	isgroup BOOL, hascheck BOOL DEFAULT false, sequence TEXT,
  	hasalts BOOL DEFAULT false, conditionstring TEXT, userscript TEXT,
@@ -201,7 +203,7 @@ begin
   	# Database table for CHECKS
   	db.execute """CREATE TABLE IF NOT EXISTS checks
 	(conversationid INT, dialogueid INT, isred BOOL DEFAULT false,
-	 difficulty INT, flagname TEXT, forced BOOL, skilltype TEXT, 
+	 difficulty INT, flagname TEXT, forced BOOL, skilltype TEXT,
   	FOREIGN KEY (conversationid,dialogueid) REFERENCES dentries(conversationid, id),
   	PRIMARY KEY(conversationid,dialogueid))""";
 
@@ -221,7 +223,7 @@ begin
   	#databse table for variables
 
   	db.execute """CREATE TABLE IF NOT EXISTS variables
-	(id INT PRIMARY KEY, name TEXT, 
+	(id INT PRIMARY KEY, name TEXT,
 	initialvalue TEXT, description TEXT)""";
 
 
@@ -294,7 +296,7 @@ begin
 		listofthingstodothisloop.select!{|k,v| v }
 		if listofthingstodothisloop.empty? then
 			listofthingstodothisloop= "THIS SHOULD NEVER RUN ACTUALLY"
-		else 
+		else
 			listofthingstodothisloop=listofthingstodothisloop.keys.join(", ")
 			listofthingstodothisloop += " (this is the BIG DATASET, pls be patient)"
 		end
@@ -309,7 +311,7 @@ begin
 				db.execute "INSERT INTO dialogues (id, title, description, actor, conversant) VALUES (?,?,?,?,?)", conversationAtts;
 				numberOfdbEntriesMade+=1;
 			end
-			
+
 			#SUB LOOP; for every conversation we also need to enter the many sub-lines of that conversation
 			for thisLine in thisConvo["dialogueEntries"] do
 				checkData=getIsCheckAttributes(thisLine)
@@ -343,7 +345,7 @@ begin
 					if doModifiers
 						modifiers=getCheckModifiersArrays(thisLine);
 						if !(modifiers.nil? or modifiers.empty?) then
-							modifiers.each do |mod| 
+							modifiers.each do |mod|
 								db.execute "INSERT INTO modifiers (conversationid, dialogueid, variable,modifier, tooltip) VALUES (?,?,?,?,?)", mod;
 								numberOfdbEntriesMade+=1
 							end
@@ -353,7 +355,7 @@ begin
 
 
 				if doAlternateLines
-					if !(altData.nil? or altData.empty?) 
+					if !(altData.nil? or altData.empty?)
 						altData.each do |alt|
 							db.execute "INSERT INTO alternates (conversationid, dialogueid, condition, alternateline) VALUES (?,?,?,?)", alt;
 							numberOfdbEntriesMade+=1;
@@ -380,12 +382,12 @@ begin
 
 	puts "inserted #{numberOfdbEntriesMade} records into the databases";
 
-	if doActorTalkativeness then 
-		#adds a value to talkativeness in actors table with the number of lines they've said 
+	if doActorTalkativeness then
+		#adds a value to talkativeness in actors table with the number of lines they've said
 		#for every actor in the actors table, counts how many times their id appears in the actor column in the dentries table
 
 		talkyArray=[]
-		
+
 		for currentActor in Array(0..408)
 			lineCount = db.execute "SELECT COUNT(*) FROM dentries WHERE actor = #{currentActor}"
 			lineCount = lineCount[0][0]
@@ -406,17 +408,16 @@ begin
 	puts "Database creation/updates took #{timetaken} seconds"
 
 
-rescue SQLite3::Exception => e 
+rescue SQLite3::Exception => e
     puts "there was a Database Creation error: " + e.to_s;
     #Rollback prevents partially complete data sets being inserted
     #minimising re-run errors after an exception is raised mid records
     # puts e.trace;
     db.rollback
 
-rescue JSON::UnparserError => e 
+rescue JSON::UnparserError => e
     puts "there was a JSON Parse error: " + e.to_s;
 ensure
     # close DB, success or fail
     db.close if db
 end
-
